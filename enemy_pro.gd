@@ -4,7 +4,7 @@ extends CharacterBody3D
 # NODES
 # =========================================================
 
-@onready var anim_player: AnimationPlayer = null
+var anim_player: AnimationPlayer = null
 @onready var soldier_model = $SoldierModel
 
 # Animation resources
@@ -40,10 +40,19 @@ func _ready():
 	add_to_group("enemies")
 	add_to_group("enemy_target")
 	
-	# Trouver l'AnimationPlayer dans le modèle instancié
-	if soldier_model:
+	# Trouver l'AnimationPlayer
+	if has_node("AnimationPlayer"):
+		anim_player = $AnimationPlayer
+		if anim_player.get_animation_list().size() == 0 and soldier_model:
+			var model_anim = soldier_model.find_child("AnimationPlayer", true, false)
+			if model_anim and model_anim.get_animation_list().size() > 0:
+				anim_player = model_anim
+	elif soldier_model:
 		anim_player = soldier_model.find_child("AnimationPlayer", true, false)
-		soldier_model.visible = true
+		if soldier_model:
+			soldier_model.visible = true
+	else:
+		anim_player = find_child("AnimationPlayer", true, false)
 	
 	# Charger les animations depuis les fichiers FBX
 	load_animations()

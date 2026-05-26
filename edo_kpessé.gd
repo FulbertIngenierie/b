@@ -4,7 +4,7 @@ extends CharacterBody3D
 # NODES
 # =========================================================
 
-@onready var anim_player = $AnimationPlayer
+var anim_player: AnimationPlayer = null
 @onready var gun_sound = $ShootSound
 
 # =========================================================
@@ -78,6 +78,7 @@ var initial_position := Vector3.ZERO  # Position initiale pour défendre
 # =========================================================
 
 func _ready():
+	_init_animation_player()
 	find_player()
 	add_to_group("enemies")
 	add_to_group("enemy_target")
@@ -91,6 +92,20 @@ func _ready():
 	
 	# Initialiser la hauteur de la tête
 	initial_head_height = standing_height
+
+func _init_animation_player():
+	if has_node("AnimationPlayer"):
+		anim_player = $AnimationPlayer
+		if anim_player.get_animation_list().size() == 0 and has_node("Model"):
+			var model_anim = $Model.find_child("AnimationPlayer", true, false)
+			if model_anim and model_anim.get_animation_list().size() > 0:
+				anim_player = model_anim
+	elif has_node("Model"):
+		var model_anim = $Model.find_child("AnimationPlayer", true, false)
+		if model_anim:
+			anim_player = model_anim
+	else:
+		anim_player = find_child("AnimationPlayer", true, false)
 
 # =========================================================
 # PHYSICS PROCESS
@@ -153,15 +168,27 @@ func move_towards_player(_delta):
 	
 	if direction.length() > 0:
 		look_at(global_position + direction, Vector3.UP)
+		rotate_y(PI)
 	
 	velocity = direction * speed
 	
-	# Jouer l'animation idle quand l'ennemi se déplace (pas d'animation de marche disponible)
-	if anim_player and anim_player.has_animation("idle"):
-		if current_anim != "idle":
-			anim_player.play("idle")
-			anim_player.speed_scale = 1.0
-			current_anim = "idle"
+	if not anim_player:
+		return
+	if current_anim == "move":
+		return
+	# Try movement-like animations, fall back to idle at faster speed
+	for anim_name in ["run", "walk", "move", "tir avant "]:
+		if anim_player.has_animation(anim_name):
+			anim_player.play(anim_name)
+			anim_player.speed_scale = 1.5
+			current_anim = "move"
+			return
+	# Fallback: play any available animation at faster speed to indicate movement
+	if anim_player.get_animation_list().size() > 0:
+		var fallback = anim_player.get_animation_list()[0]
+		anim_player.play(fallback)
+		anim_player.speed_scale = 2.0
+		current_anim = "move"
 
 # =========================================================
 # VOIR LE JOUEUR
@@ -546,14 +573,22 @@ func reload():
 # =========================================================
 
 func play_idle():
-	
-	if anim_player:
-		if anim_player.has_animation("idle"):
-			anim_player.play("idle")
+	if not anim_player:
+		return
+	if current_anim == "idle":
+		return
+	for anim_name in ["idle", "Idle", "IDLE"]:
+		if anim_player.has_animation(anim_name):
+			anim_player.play(anim_name)
+			anim_player.speed_scale = 1.0
 			current_anim = "idle"
-		elif anim_player.has_animation("Idle"):
-			anim_player.play("Idle")
-			current_anim = "Idle"
+			return
+	# Fallback: play the first available animation slowly as idle
+	if anim_player.get_animation_list().size() > 0:
+		var fallback = anim_player.get_animation_list()[0]
+		anim_player.play(fallback)
+		anim_player.speed_scale = 0.3
+		current_anim = "idle"
 
 # =========================================================
 # GETTERS
