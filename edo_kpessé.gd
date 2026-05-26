@@ -63,13 +63,14 @@ enum CombatState {
 var current_state := CombatState.IDLE_PATROL
 var hold_timer := 0.0
 var hold_duration := 12.0
-var advance_target := Vector3.ZERO
+var flank_target := Vector3.ZERO
 var cover_position := Vector3.ZERO
 var last_seen_position := Vector3.ZERO
 var time_since_last_seen := 0.0
 var enemy_id := 0
 var initial_position := Vector3.ZERO
 var has_seen_player := false
+var stop_distance := 15.0
 
 # =========================================================
 # PATROL — avant de voir le joueur
@@ -240,7 +241,6 @@ func _physics_process(delta):
 		if not has_seen_player:
 			has_seen_player = true
 			current_state = CombatState.ADVANCE
-			_pick_advance_target()
 	else:
 		time_since_last_seen += delta
 	
@@ -394,19 +394,10 @@ func _handle_idle_patrol(delta):
 		_play_anim_continuous(anim_walk, "walk")
 
 # =========================================================
-# ÉTAT 2: AVANCER — progresser vers le joueur
+# ÉTAT 2: AVANCER — directement vers le joueur
 # =========================================================
 
-func _pick_advance_target():
-	if not player:
-		return
-	var to_player = (player.global_position - global_position).normalized()
-	var dist = global_position.distance_to(player.global_position)
-	var advance_dist = min(dist * 0.6, 15.0)
-	advance_target = global_position + to_player * advance_dist
-	advance_target.y = global_position.y
-
-func _handle_advance(delta, distance_to_player):
+func _handle_advance(_delta, distance_to_player):
 	if not player:
 		return
 	
@@ -415,12 +406,8 @@ func _handle_advance(delta, distance_to_player):
 	if can_see_player() and can_shoot:
 		shoot_at_player()
 	
-	if advance_target == Vector3.ZERO:
-		_pick_advance_target()
-	
-	var dist_to_target = Vector2(global_position.x, global_position.z).distance_to(Vector2(advance_target.x, advance_target.z))
-	
-	if dist_to_target < 2.5 or distance_to_player < 12.0:
+	# Arrivé à portée de tir → s'arrêter et tenir la position
+	if distance_to_player <= stop_distance:
 		velocity.x = 0
 		velocity.z = 0
 		current_state = CombatState.HOLD_POSITION
@@ -428,12 +415,28 @@ func _handle_advance(delta, distance_to_player):
 		hold_duration = randf_range(10.0, 15.0)
 		return
 	
-	var direction = (advance_target - global_position)
+	# Perdu de vue depuis longtemps → aller à la dernière position connue
+	if time_since_last_seen > 8.0 and not can_see_player():
+		velocity.x = 0
+		velocity.z = 0
+		current_state = CombatState.HOLD_POSITION
+		hold_timer = 0.0
+		hold_duration = randf_range(5.0, 8.0)
+		return
+	
+	# Avancer DIRECTEMENT vers le joueur (pas de point intermédiaire)
+	var target_pos = player.global_position if can_see_player() else last_seen_position
+	var direction = (target_pos - global_position)
 	direction.y = 0
-	direction = direction.normalized()
-	velocity.x = direction.x * run_speed
-	velocity.z = direction.z * run_speed
-	_play_anim_continuous(anim_run, "run")
+	if direction.length() > 0.5:
+		direction = direction.normalized()
+		velocity.x = direction.x * run_speed
+		velocity.z = direction.z * run_speed
+		_play_anim_continuous(anim_run, "run")
+	else:
+		velocity.x = 0
+		velocity.z = 0
+		_play_anim_continuous(anim_idle, "idle")
 
 # =========================================================
 # ÉTAT 3: TENIR POSITION — rester et tirer 10-15s
@@ -463,10 +466,11 @@ func _handle_hold_position(delta, distance_to_player):
 			return
 	
 	if hold_timer >= hold_duration:
-		if distance_to_player > 15.0:
+		if distance_to_player > stop_distance:
+			# Trop loin → avancer encore
 			current_state = CombatState.ADVANCE
-			_pick_advance_target()
 		else:
+			# À portée → flanquer pour changer de position
 			current_state = CombatState.FLANK
 			_pick_flank_target()
 
@@ -511,7 +515,6 @@ func _handle_cover(delta):
 		is_behind_cover = false
 		cover_position = Vector3.ZERO
 		current_state = CombatState.ADVANCE
-		_pick_advance_target()
 
 # =========================================================
 # ÉTAT 5: FLANQUER — changer de position latérale
@@ -521,13 +524,15 @@ func _pick_flank_target():
 	if not player:
 		return
 	var to_player = (player.global_position - global_position).normalized()
+	# Direction latérale (perpendiculaire au joueur)
 	var flank_dir = Vector3(-to_player.z, 0, to_player.x)
 	if randf() < 0.5:
 		flank_dir = -flank_dir
-	advance_target = global_position + flank_dir * randf_range(6, 12) + to_player * randf_range(1, 4)
-	advance_target.y = global_position.y
+	# Toujours avancer un peu vers le joueur, jamais reculer
+	flank_target = global_position + flank_dir * randf_range(5, 10) + to_player * randf_range(2, 5)
+	flank_target.y = global_position.y
 
-func _handle_flank(delta, distance_to_player):
+func _handle_flank(_delta, _distance_to_player):
 	if not player:
 		return
 	
@@ -536,9 +541,13 @@ func _handle_flank(delta, distance_to_player):
 	if can_see_player() and can_shoot:
 		shoot_at_player()
 	
-	var dist_to_target = Vector2(global_position.x, global_position.z).distance_to(Vector2(advance_target.x, advance_target.z))
+	if flank_target == Vector3.ZERO:
+		_pick_flank_target()
+	
+	var dist_to_target = Vector2(global_position.x, global_position.z).distance_to(Vector2(flank_target.x, flank_target.z))
 	
 	if dist_to_target < 2.5:
+		flank_target = Vector3.ZERO
 		current_state = CombatState.HOLD_POSITION
 		hold_timer = 0.0
 		hold_duration = randf_range(10.0, 15.0)
@@ -546,12 +555,16 @@ func _handle_flank(delta, distance_to_player):
 		velocity.z = 0
 		return
 	
-	var direction = (advance_target - global_position)
+	var direction = (flank_target - global_position)
 	direction.y = 0
-	direction = direction.normalized()
-	velocity.x = direction.x * run_speed
-	velocity.z = direction.z * run_speed
-	_play_anim_continuous(anim_run, "run")
+	if direction.length() > 0.5:
+		direction = direction.normalized()
+		velocity.x = direction.x * run_speed
+		velocity.z = direction.z * run_speed
+		_play_anim_continuous(anim_run, "run")
+	else:
+		velocity.x = 0
+		velocity.z = 0
 
 # =========================================================
 # ROTATION
