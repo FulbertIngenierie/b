@@ -126,15 +126,17 @@ func _show_enemy_bar(enemy, camera):
 	
 	if "health" in enemy:
 		var fill = bar.get_node_or_null("Fill")
-		if fill:
+		if fill and fill is MeshInstance3D:
 			var hp_ratio = float(enemy.health) / 100.0
 			fill.scale.x = hp_ratio
-			if hp_ratio > 0.5:
-				fill.color = Color(0.2, 1, 0.2, 0.8)
-			elif hp_ratio > 0.25:
-				fill.color = Color(1, 0.8, 0, 0.8)
-			else:
-				fill.color = Color(1, 0.2, 0.2, 0.8)
+			var mat = fill.material_override as StandardMaterial3D
+			if mat:
+				if hp_ratio > 0.5:
+					mat.albedo_color = Color(0.2, 1, 0.2, 0.8)
+				elif hp_ratio > 0.25:
+					mat.albedo_color = Color(1, 0.8, 0, 0.8)
+				else:
+					mat.albedo_color = Color(1, 0.2, 0.2, 0.8)
 	
 	bar.visible = true
 

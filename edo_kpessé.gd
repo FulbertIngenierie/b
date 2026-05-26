@@ -638,10 +638,8 @@ func shoot():
 	
 	var bullet = bullet_scene.instantiate()
 	bullet.direction = direction
-	bullet.look_at_from_position(spawn_pos, spawn_pos + direction, Vector3.UP)
-	bullet.global_position = spawn_pos
 	
-	call_deferred("_add_bullet", bullet)
+	call_deferred("_add_bullet", bullet, spawn_pos, direction)
 	
 	var space_state = get_world_3d().direct_space_state
 	var ray_end = spawn_pos + direction * 500.0
@@ -655,9 +653,11 @@ func shoot():
 			collider.take_damage(damage)
 		create_impact(result.position, result.normal)
 
-func _add_bullet(bullet):
+func _add_bullet(bullet, spawn_pos: Vector3, direction: Vector3):
 	if is_inside_tree() and get_tree():
 		get_tree().current_scene.add_child(bullet)
+		bullet.global_position = spawn_pos
+		bullet.look_at(spawn_pos + direction, Vector3.UP)
 
 # =========================================================
 # IMPACT
