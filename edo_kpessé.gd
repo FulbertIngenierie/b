@@ -42,22 +42,21 @@ var health := 100
 var is_dead := false
 
 var current_anim := ""
-var anim_looping := false
 
 # =========================================================
-# GRAVITY — force au sol
+# GRAVITY
 # =========================================================
 
 var gravity := 20.0
 
 # =========================================================
-# PATROL
+# PATROL — sécuriser 10-15s avant de changer
 # =========================================================
 
 var patrol_points: Array[Vector3] = []
 var current_patrol_index := 0
 var patrol_wait_timer := 0.0
-var patrol_wait_time := 3.0
+var patrol_wait_time := 12.0
 var patrol_radius := 15.0
 
 # =========================================================
@@ -86,7 +85,7 @@ var initial_position := Vector3.ZERO
 # =========================================================
 
 var reposition_timer := 0.0
-var reposition_interval := 8.0
+var reposition_interval := 12.0
 var reposition_target := Vector3.ZERO
 
 # =========================================================
@@ -113,7 +112,7 @@ var anim_crouch := ""
 var all_anims: PackedStringArray = []
 
 # =========================================================
-# SMOOTH ROTATION
+# SMOOTH ROTATION — toujours face au joueur
 # =========================================================
 
 var rotation_speed := 8.0
@@ -179,15 +178,15 @@ func _find_anim(candidates: Array) -> String:
 func _ensure_animations_loop():
 	if not anim_player:
 		return
-	var loop_anims = [anim_idle, anim_walk, anim_run, anim_crouch]
+	var loop_anims = [anim_idle, anim_walk, anim_run, anim_crouch, anim_shoot]
 	for anim_name in loop_anims:
 		if anim_name == "":
 			continue
-		var anim_lib = _get_animation_library(anim_name)
-		if anim_lib:
-			anim_lib.loop_mode = Animation.LOOP_LINEAR
+		var anim = _get_animation_resource(anim_name)
+		if anim:
+			anim.loop_mode = Animation.LOOP_LINEAR
 
-func _get_animation_library(anim_name: String) -> Animation:
+func _get_animation_resource(anim_name: String) -> Animation:
 	if not anim_player:
 		return null
 	var libs = anim_player.get_animation_library_list()
@@ -375,7 +374,7 @@ func _find_best_cover() -> Vector3:
 	return best_pos
 
 # =========================================================
-# GESTION DES ÉTATS
+# GESTION DES ÉTATS — style Call of Duty
 # =========================================================
 
 func handle_patrol(delta, _distance_to_player):
@@ -388,7 +387,7 @@ func handle_patrol(delta, _distance_to_player):
 		return
 	
 	if patrol_points.is_empty():
-		play_idle()
+		_play_anim_continuous(anim_idle, "idle")
 		velocity.x = 0
 		velocity.z = 0
 		return
@@ -401,7 +400,7 @@ func handle_patrol(delta, _distance_to_player):
 		patrol_wait_timer += delta
 		velocity.x = 0
 		velocity.z = 0
-		play_idle()
+		_play_anim_continuous(anim_idle, "idle")
 		
 		if patrol_wait_timer >= patrol_wait_time:
 			patrol_wait_timer = 0.0
@@ -414,9 +413,9 @@ func handle_patrol(delta, _distance_to_player):
 		velocity.z = direction.z * speed
 		
 		_face_direction(direction)
-		play_walk()
+		_play_anim_continuous(anim_walk, "walk")
 
-func handle_chase(delta, distance_to_player):
+func handle_chase(_delta, distance_to_player):
 	if can_see_player():
 		if distance_to_player <= attack_range:
 			current_state = CombatState.ATTACK
@@ -425,6 +424,8 @@ func handle_chase(delta, distance_to_player):
 		current_state = CombatState.PATROL
 		return
 	
+	_face_player()
+	
 	var target = last_seen_position if last_seen_position != Vector3.ZERO else player.global_position
 	var direction = (target - global_position)
 	direction.y = 0
@@ -432,8 +433,7 @@ func handle_chase(delta, distance_to_player):
 	velocity.x = direction.x * run_speed
 	velocity.z = direction.z * run_speed
 	
-	_face_direction(direction)
-	play_run()
+	_play_anim_continuous(anim_run, "run")
 	
 	if can_shoot and can_see_player():
 		shoot_at_player()
@@ -460,11 +460,8 @@ func handle_attack(_delta, distance_to_player):
 	if can_shoot:
 		shoot_at_player()
 	
-	var strafe_dir = Vector3.ZERO
-	var strafe_rand = sin(Time.get_ticks_msec() * 0.001 + enemy_id * 0.1)
-	strafe_dir = global_transform.basis.x * strafe_rand * speed * 0.3
-	velocity.x = strafe_dir.x
-	velocity.z = strafe_dir.z
+	velocity.x = 0
+	velocity.z = 0
 	
 	if health < 40 and not nearby_obstacles.is_empty():
 		var cover_pos = _find_best_cover()
@@ -473,7 +470,7 @@ func handle_attack(_delta, distance_to_player):
 			current_state = CombatState.COVER
 			return
 	
-	if reposition_timer >= reposition_interval and randf() < 0.02:
+	if reposition_timer >= reposition_interval:
 		current_state = CombatState.REPOSITION
 		_pick_reposition_target()
 		reposition_timer = 0.0
@@ -492,20 +489,21 @@ func handle_cover(_delta, _distance_to_player):
 		velocity.x = direction.x * run_speed
 		velocity.z = direction.z * run_speed
 		
-		_face_direction(direction)
-		play_run()
+		_face_player()
+		_play_anim_continuous(anim_run, "run")
 	else:
 		velocity.x = 0
 		velocity.z = 0
 		is_behind_cover = true
 		
+		_face_player()
+		
 		if anim_crouch != "":
-			_play_anim(anim_crouch, "crouch")
+			_play_anim_continuous(anim_crouch, "crouch")
 		else:
-			play_idle()
+			_play_anim_continuous(anim_idle, "idle")
 		
 		if can_see_player() and can_shoot:
-			_face_player()
 			shoot_at_player()
 		
 		if is_inside_tree() and get_tree():
@@ -520,6 +518,8 @@ func handle_retreat(_delta, distance_to_player):
 		current_state = CombatState.PATROL
 		return
 	
+	_face_player()
+	
 	var cover_pos = _find_best_cover()
 	if cover_pos != Vector3.ZERO:
 		cover_position = cover_pos
@@ -532,8 +532,7 @@ func handle_retreat(_delta, distance_to_player):
 	velocity.x = direction.x * run_speed
 	velocity.z = direction.z * run_speed
 	
-	_face_direction(direction)
-	play_run()
+	_play_anim_continuous(anim_run, "run")
 	
 	if distance_to_player > attack_range * 2.0:
 		current_state = CombatState.ATTACK
@@ -543,14 +542,18 @@ func handle_reposition(_delta, _distance_to_player):
 		current_state = CombatState.ATTACK
 		return
 	
+	_face_player()
+	
 	var direction = (reposition_target - global_position)
 	direction.y = 0
 	direction = direction.normalized()
 	velocity.x = direction.x * run_speed
 	velocity.z = direction.z * run_speed
 	
-	_face_direction(direction)
-	play_run()
+	_play_anim_continuous(anim_run, "run")
+	
+	if can_see_player() and can_shoot:
+		shoot_at_player()
 	
 	if global_position.distance_to(reposition_target) < 2.0:
 		reposition_target = Vector3.ZERO
@@ -559,16 +562,6 @@ func handle_reposition(_delta, _distance_to_player):
 func _pick_reposition_target():
 	if not player:
 		return
-	var allies = get_tree().get_nodes_in_group("enemies")
-	var avg_pos := Vector3.ZERO
-	var count := 0
-	for ally in allies:
-		if ally != self and is_instance_valid(ally) and not ally.is_dead:
-			avg_pos += ally.global_position
-			count += 1
-	if count > 0:
-		avg_pos /= count
-	
 	var to_player = (player.global_position - global_position).normalized()
 	var flank_dir = Vector3(-to_player.z, 0, to_player.x)
 	if randf() < 0.5:
@@ -578,7 +571,7 @@ func _pick_reposition_target():
 	reposition_target.y = global_position.y
 
 # =========================================================
-# ROTATION DOUCE
+# ROTATION — TOUJOURS face au joueur
 # =========================================================
 
 func _face_direction(direction: Vector3):
@@ -638,10 +631,6 @@ func shoot_at_player():
 		can_shoot = true
 	else:
 		can_shoot = true
-
-# =========================================================
-# CALCUL POSITION GUN TIP
-# =========================================================
 
 func get_gun_tip_position() -> Vector3:
 	return global_position + global_transform.basis * gun_tip_offset
@@ -731,91 +720,51 @@ func reload():
 	ammo = max_ammo
 
 # =========================================================
-# ANIMATIONS — boucle continue et attribution correcte
+# ANIMATIONS — boucle continue, ne jamais stopper
 # =========================================================
 
-func _play_anim(anim_name: String, tag: String):
+func _play_anim_continuous(anim_name: String, tag: String):
 	if not anim_player:
 		return
-	if current_anim == tag:
+	if anim_name == "":
+		if all_anims.size() > 0:
+			anim_name = all_anims[0]
+		else:
+			return
+	if not anim_player.has_animation(anim_name):
 		return
-	if anim_name != "" and anim_player.has_animation(anim_name):
-		anim_player.play(anim_name)
-		anim_player.speed_scale = 1.0
-		current_anim = tag
+	if current_anim == tag and anim_player.is_playing():
+		return
+	anim_player.play(anim_name)
+	anim_player.speed_scale = 1.0
+	current_anim = tag
 
 func _play_anim_shoot():
 	if not anim_player:
 		return
 	var moving = velocity.length() > 0.5
 	if moving and anim_shoot_walk != "":
-		if current_anim != "shoot_walk":
-			anim_player.play(anim_shoot_walk)
-			anim_player.speed_scale = 1.0
-			current_anim = "shoot_walk"
+		_play_anim_continuous(anim_shoot_walk, "shoot_walk")
 	elif anim_shoot != "":
-		if current_anim != "shoot":
-			anim_player.play(anim_shoot)
-			anim_player.speed_scale = 1.0
-			current_anim = "shoot"
+		_play_anim_continuous(anim_shoot, "shoot")
 
 func play_idle():
-	if not anim_player:
-		return
-	if current_anim == "idle":
-		return
-	if anim_idle != "":
-		anim_player.play(anim_idle)
-		anim_player.speed_scale = 1.0
-		current_anim = "idle"
-	elif all_anims.size() > 0:
-		anim_player.play(all_anims[0])
-		anim_player.speed_scale = 0.3
-		current_anim = "idle"
+	_play_anim_continuous(anim_idle, "idle")
 
 func play_walk():
-	if not anim_player:
-		return
-	if current_anim == "walk":
-		return
 	if anim_walk != "":
-		anim_player.play(anim_walk)
-		anim_player.speed_scale = 1.0
-		current_anim = "walk"
+		_play_anim_continuous(anim_walk, "walk")
 	elif anim_run != "":
-		anim_player.play(anim_run)
-		anim_player.speed_scale = 0.6
-		current_anim = "walk"
-	elif all_anims.size() > 0:
-		anim_player.play(all_anims[0])
-		anim_player.speed_scale = 1.5
-		current_anim = "walk"
+		_play_anim_continuous(anim_run, "walk")
 
 func play_run():
-	if not anim_player:
-		return
-	if current_anim == "run":
-		return
 	if anim_run != "":
-		anim_player.play(anim_run)
-		anim_player.speed_scale = 1.0
-		current_anim = "run"
+		_play_anim_continuous(anim_run, "run")
 	elif anim_walk != "":
-		anim_player.play(anim_walk)
-		anim_player.speed_scale = 1.8
-		current_anim = "run"
-	elif all_anims.size() > 0:
-		anim_player.play(all_anims[0])
-		anim_player.speed_scale = 2.0
-		current_anim = "run"
+		_play_anim_continuous(anim_walk, "run")
 
 func play_shoot():
-	if not anim_player:
-		return
-	if anim_shoot != "":
-		anim_player.play(anim_shoot)
-		anim_player.speed_scale = 1.0
-		current_anim = "shoot"
+	_play_anim_continuous(anim_shoot, "shoot")
 
 # =========================================================
 # GETTERS

@@ -19,7 +19,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0, 0, 0, 0.6)
+color = Color(0, 0, 0, 0.75)
 mouse_filter = 2
 
 [node name="Panel" type="Panel" parent="."]
@@ -29,26 +29,65 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -150.0
-offset_top = -160.0
-offset_right = 150.0
-offset_bottom = 160.0
+offset_left = -200.0
+offset_top = -220.0
+offset_right = 200.0
+offset_bottom = 220.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="TitleLabel" type="Label" parent="Panel"]
+[node name="GameTitle" type="Label" parent="Panel"]
 layout_mode = 1
 anchors_preset = 5
 anchor_left = 0.5
 anchor_right = 0.5
-offset_left = -60.0
-offset_top = 10.0
-offset_right = 60.0
-offset_bottom = 40.0
+offset_left = -180.0
+offset_top = 12.0
+offset_right = 180.0
+offset_bottom = 52.0
 grow_horizontal = 2
-text = "PAUSE"
+text = "AKA_FPK"
 horizontal_alignment = 1
 vertical_alignment = 1
+
+[node name="SubTitle" type="Label" parent="Panel"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -180.0
+offset_top = 50.0
+offset_right = 180.0
+offset_bottom = 72.0
+grow_horizontal = 2
+text = "AKA First Person Killer"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="PlayerLabel" type="Label" parent="Panel"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -180.0
+offset_top = 72.0
+offset_right = 180.0
+offset_bottom = 92.0
+grow_horizontal = 2
+text = "Joueur: AKAZZA"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Separator" type="HSeparator" parent="Panel"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -160.0
+offset_top = 96.0
+offset_right = 160.0
+offset_bottom = 100.0
+grow_horizontal = 2
 
 [node name="VBoxContainer" type="VBoxContainer" parent="Panel"]
 layout_mode = 1
@@ -57,27 +96,31 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -100.0
-offset_top = -70.0
-offset_right = 100.0
-offset_bottom = 130.0
+offset_left = -130.0
+offset_top = -50.0
+offset_right = 130.0
+offset_bottom = 150.0
 grow_horizontal = 2
 grow_vertical = 2
 
 [node name="ResumeButton" type="Button" parent="Panel/VBoxContainer"]
 layout_mode = 2
+custom_minimum_size = Vector2(0, 40)
 text = "REPRENDRE"
 
 [node name="RestartButton" type="Button" parent="Panel/VBoxContainer"]
 layout_mode = 2
+custom_minimum_size = Vector2(0, 40)
 text = "RECOMMENCER"
 
 [node name="SettingsButton" type="Button" parent="Panel/VBoxContainer"]
 layout_mode = 2
+custom_minimum_size = Vector2(0, 40)
 text = "PARAMÈTRES"
 
 [node name="QuitButton" type="Button" parent="Panel/VBoxContainer"]
 layout_mode = 2
+custom_minimum_size = Vector2(0, 40)
 text = "QUITTER"
 
 [node name="SettingsPanel" type="Panel" parent="."]
@@ -88,10 +131,10 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -180.0
-offset_top = -130.0
-offset_right = 180.0
-offset_bottom = 130.0
+offset_left = -200.0
+offset_top = -160.0
+offset_right = 200.0
+offset_bottom = 160.0
 grow_horizontal = 2
 grow_vertical = 2
 
@@ -109,7 +152,7 @@ grow_vertical = 2
 
 [node name="SettingsTitle" type="Label" parent="SettingsPanel/VBoxContainer"]
 layout_mode = 2
-text = "PARAMÈTRES"
+text = "PARAMÈTRES — AKA_FPK"
 horizontal_alignment = 1
 
 [node name="BrightnessLabel" type="Label" parent="SettingsPanel/VBoxContainer"]
@@ -136,4 +179,5 @@ value = 1.0
 
 [node name="BackButton" type="Button" parent="SettingsPanel/VBoxContainer"]
 layout_mode = 2
+custom_minimum_size = Vector2(0, 40)
 text = "RETOUR"
