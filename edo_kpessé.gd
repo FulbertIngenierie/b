@@ -26,11 +26,12 @@ var bullet_impact_scene = preload("res://BulletImpact.tscn")
 # VARIABLES
 # =========================================================
 
-var speed := 3.5
-var run_speed := 6.0
+var speed := 3.0
+var run_speed := 5.0
 var detection_range := 80.0
 var attack_range := 45.0
 var damage := 10.0
+var velocity_smoothing := 10.0
 
 var player: CharacterBody3D
 var can_shoot := true
@@ -109,7 +110,7 @@ var all_anims: PackedStringArray = []
 # SMOOTH ROTATION
 # =========================================================
 
-var rotation_speed := 8.0
+var rotation_speed := 5.0
 var target_rotation_y := 0.0
 
 # =========================================================
@@ -396,7 +397,7 @@ func _handle_idle_patrol(delta):
 # ÉTAT 2: AVANCER — directement vers le joueur
 # =========================================================
 
-func _handle_advance(_delta, distance_to_player):
+func _handle_advance(delta, distance_to_player):
 	if not player:
 		return
 	
@@ -429,12 +430,14 @@ func _handle_advance(_delta, distance_to_player):
 	direction.y = 0
 	if direction.length() > 0.5:
 		direction = direction.normalized()
-		velocity.x = direction.x * run_speed
-		velocity.z = direction.z * run_speed
+		var target_vx = direction.x * run_speed
+		var target_vz = direction.z * run_speed
+		velocity.x = lerp(velocity.x, target_vx, clamp(velocity_smoothing * delta, 0.0, 1.0))
+		velocity.z = lerp(velocity.z, target_vz, clamp(velocity_smoothing * delta, 0.0, 1.0))
 		_play_anim_continuous(anim_run, "run")
 	else:
-		velocity.x = 0
-		velocity.z = 0
+		velocity.x = lerp(velocity.x, 0.0, clamp(velocity_smoothing * delta, 0.0, 1.0))
+		velocity.z = lerp(velocity.z, 0.0, clamp(velocity_smoothing * delta, 0.0, 1.0))
 		_play_anim_continuous(anim_idle, "idle")
 
 # =========================================================

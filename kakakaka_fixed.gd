@@ -59,6 +59,36 @@ var current_speed = 5.0
 var is_sprinting := false
 
 # =========================================================
+# CAMÉRA 3ÈME / 1ÈRE PERSONNE
+# =========================================================
+
+var is_first_person := false
+var cam_offset_3rd := Vector3(0.8, 2.5, 4.0)
+var cam_offset_1st := Vector3(0, 0, 0)
+var cam_lerp_speed := 12.0
+
+# =========================================================
+# ARMES
+# =========================================================
+
+var current_weapon := 0
+var weapons := ["AK47", "PISTOL"]
+var weapon_fire_rates := [0.08, 0.15]
+var weapon_damages := [25, 40]
+var weapon_ammos := [30, 12]
+var weapon_max_ammos := [30, 12]
+var weapon_names := ["AK-47", "PISTOL"]
+
+# =========================================================
+# GRENADES
+# =========================================================
+
+var grenades := 3
+var max_grenades := 5
+var can_throw_grenade := true
+var grenade_cooldown := 1.5
+
+# =========================================================
 # SHOOT
 # =========================================================
 
@@ -68,6 +98,7 @@ var shooting = false
 var can_auto_fire = false
 
 var fire_rate = 0.08
+var player_damage = 25
 
 # =========================================================
 # ZOOM
@@ -174,6 +205,12 @@ func _ready():
 	_create_kill_counter_ui()
 	_create_kill_streak_label()
 	_create_death_screen()
+	_create_weapon_label()
+	_create_grenade_label()
+	
+	# Commencer en 3ème personne
+	_set_camera_mode(false)
+	_switch_weapon(0)
 
 # =========================================================
 # INPUT
@@ -225,10 +262,27 @@ func _input(event):
 	if event is InputEventKey:
 
 		if event.keycode == KEY_R:
-
 			if event.pressed:
-
 				reload_once()
+		
+		# T = basculer caméra 1ère/3ème personne
+		if event.keycode == KEY_T:
+			if event.pressed:
+				is_first_person = !is_first_person
+				_set_camera_mode(is_first_person)
+		
+		# 1/2 = changer d'arme
+		if event.keycode == KEY_1:
+			if event.pressed:
+				_switch_weapon(0)
+		if event.keycode == KEY_2:
+			if event.pressed:
+				_switch_weapon(1)
+		
+		# G = lancer grenade
+		if event.keycode == KEY_G:
+			if event.pressed:
+				throw_grenade()
 
 # =========================================================
 # AUTO FIRE
@@ -338,6 +392,17 @@ func _process(delta):
 	# Update kill counter
 	if kill_counter_label:
 		kill_counter_label.text = "KILLS: " + str(kill_count)
+	
+	# Update weapon label
+	if weapon_label:
+		weapon_label.text = weapon_names[current_weapon] + " | " + str(ammo) + "/" + str(total_ammo)
+	
+	# Update grenade label
+	if grenade_label:
+		grenade_label.text = "GRENADES: " + str(grenades)
+	
+	# Camera 3ème personne smooth
+	_update_camera_position(delta)
 
 	update_animation()
 
@@ -503,7 +568,7 @@ func create_impact(pos, normal_vec, collider = null):
 	impact.global_position = pos
 	
 	if collider and is_instance_valid(collider) and collider.has_method("take_damage"):
-		collider.take_damage(25)
+		collider.take_damage(player_damage)
 		_show_hit_marker()
 		
 		if "is_dead" in collider and collider.is_dead:
@@ -867,3 +932,178 @@ func _update_death_screen(_delta):
 		var score_label = death_screen.get_node_or_null("DeathScore")
 		if score_label:
 			score_label.text = "Score: " + str(kill_count) + " kills"
+
+# =========================================================
+# CAMÉRA 3ÈME / 1ÈRE PERSONNE
+# =========================================================
+
+var weapon_label: Label = null
+var grenade_label: Label = null
+
+func _set_camera_mode(first_person: bool):
+	is_first_person = first_person
+	var char_model = get_node_or_null("CharacterModel")
+	if char_model:
+		char_model.visible = !first_person
+	if camera:
+		if first_person:
+			camera.position = cam_offset_1st
+		else:
+			camera.position = cam_offset_3rd
+
+func _update_camera_position(delta):
+	if not camera:
+		return
+	var target_offset = cam_offset_1st if is_first_person else cam_offset_3rd
+	camera.position = camera.position.lerp(target_offset, cam_lerp_speed * delta)
+
+# =========================================================
+# CHANGEMENT D'ARME
+# =========================================================
+
+func _switch_weapon(index: int):
+	if index < 0 or index >= weapons.size():
+		return
+	current_weapon = index
+	fire_rate = weapon_fire_rates[index]
+	player_damage = weapon_damages[index]
+	ammo = weapon_ammos[index]
+	max_ammo = weapon_max_ammos[index]
+
+# =========================================================
+# GRENADES
+# =========================================================
+
+func throw_grenade():
+	if grenades <= 0 or not can_throw_grenade:
+		return
+	if is_dead:
+		return
+	
+	can_throw_grenade = false
+	grenades -= 1
+	
+	var grenade = _create_grenade()
+	if grenade:
+		var spawn_pos = global_position + Vector3(0, 1.5, 0)
+		var direction = (-camera.global_transform.basis.z).normalized()
+		
+		get_tree().current_scene.add_child(grenade)
+		grenade.global_position = spawn_pos
+		
+		if grenade is RigidBody3D:
+			grenade.linear_velocity = direction * 20.0 + Vector3(0, 5.0, 0)
+	
+	if is_inside_tree() and get_tree():
+		await get_tree().create_timer(grenade_cooldown).timeout
+		can_throw_grenade = true
+
+func _create_grenade() -> Node3D:
+	var grenade = RigidBody3D.new()
+	grenade.name = "Grenade"
+	grenade.mass = 0.5
+	grenade.gravity_scale = 1.5
+	
+	var collision = CollisionShape3D.new()
+	var sphere = SphereShape3D.new()
+	sphere.radius = 0.15
+	collision.shape = sphere
+	grenade.add_child(collision)
+	
+	var mesh = MeshInstance3D.new()
+	var sphere_mesh = SphereMesh.new()
+	sphere_mesh.radius = 0.15
+	sphere_mesh.height = 0.3
+	mesh.mesh = sphere_mesh
+	var mat = StandardMaterial3D.new()
+	mat.albedo_color = Color(0.2, 0.3, 0.15, 1)
+	mesh.material_override = mat
+	grenade.add_child(mesh)
+	
+	# Timer d'explosion
+	var timer = Timer.new()
+	timer.wait_time = 2.5
+	timer.one_shot = true
+	timer.autostart = true
+	grenade.add_child(timer)
+	timer.timeout.connect(func(): _grenade_explode(grenade))
+	
+	return grenade
+
+func _grenade_explode(grenade: Node3D):
+	if not grenade or not is_instance_valid(grenade):
+		return
+	if not grenade.is_inside_tree():
+		return
+	
+	var explosion_pos = grenade.global_position
+	var explosion_radius = 8.0
+	var explosion_damage = 80
+	
+	# Dégâts aux ennemis dans le rayon
+	var enemies = get_tree().get_nodes_in_group("enemies")
+	for enemy in enemies:
+		if not is_instance_valid(enemy):
+			continue
+		var dist = explosion_pos.distance_to(enemy.global_position)
+		if dist < explosion_radius:
+			var dmg = int(explosion_damage * (1.0 - dist / explosion_radius))
+			if enemy.has_method("take_damage"):
+				enemy.take_damage(dmg)
+				if "is_dead" in enemy and enemy.is_dead:
+					_on_enemy_killed()
+	
+	# Effet visuel explosion
+	if hit_effect_scene:
+		for i in range(3):
+			var effect = hit_effect_scene.instantiate()
+			get_tree().current_scene.add_child(effect)
+			effect.global_position = explosion_pos + Vector3(randf_range(-1, 1), randf_range(0, 2), randf_range(-1, 1))
+			effect.emitting = true
+			effect.one_shot = true
+	
+	grenade.queue_free()
+
+# =========================================================
+# UI ARME + GRENADE
+# =========================================================
+
+func _create_weapon_label():
+	var canvas = get_tree().current_scene.get_node_or_null("CanvasLayer")
+	if not canvas:
+		return
+	
+	weapon_label = Label.new()
+	weapon_label.name = "WeaponLabel"
+	weapon_label.text = "AK-47 | 30/120"
+	weapon_label.add_theme_font_size_override("font_size", 18)
+	weapon_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.9))
+	weapon_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	weapon_label.add_theme_constant_override("shadow_offset_x", 1)
+	weapon_label.add_theme_constant_override("shadow_offset_y", 1)
+	weapon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	weapon_label.anchors_preset = Control.PRESET_BOTTOM_RIGHT
+	weapon_label.position = Vector2(-250, -35)
+	weapon_label.size = Vector2(240, 30)
+	weapon_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	canvas.add_child(weapon_label)
+
+func _create_grenade_label():
+	var canvas = get_tree().current_scene.get_node_or_null("CanvasLayer")
+	if not canvas:
+		return
+	
+	grenade_label = Label.new()
+	grenade_label.name = "GrenadeLabel"
+	grenade_label.text = "GRENADES: 3"
+	grenade_label.add_theme_font_size_override("font_size", 16)
+	grenade_label.add_theme_color_override("font_color", Color(0.8, 1, 0.5, 0.9))
+	grenade_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	grenade_label.add_theme_constant_override("shadow_offset_x", 1)
+	grenade_label.add_theme_constant_override("shadow_offset_y", 1)
+	grenade_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	grenade_label.anchors_preset = Control.PRESET_BOTTOM_RIGHT
+	grenade_label.position = Vector2(-250, -15)
+	grenade_label.size = Vector2(240, 25)
+	grenade_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	canvas.add_child(grenade_label)
