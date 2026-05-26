@@ -577,7 +577,7 @@ func _pick_reposition_target():
 func _face_direction(direction: Vector3):
 	if direction.length_squared() < 0.001:
 		return
-	target_rotation_y = atan2(direction.x, direction.z) + PI
+	target_rotation_y = atan2(direction.x, direction.z)
 
 func _face_player():
 	if not player:
@@ -585,7 +585,7 @@ func _face_player():
 	var direction = (player.global_position - global_position)
 	direction.y = 0
 	if direction.length_squared() > 0.001:
-		target_rotation_y = atan2(direction.x, direction.z) + PI
+		target_rotation_y = atan2(direction.x, direction.z)
 
 func find_cover_position():
 	var cover_pos = _find_best_cover()
