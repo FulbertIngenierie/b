@@ -421,12 +421,15 @@ func _handle_advance(delta, distance_to_player):
 		hold_duration = randf_range(10.0, 15.0)
 		return
 	
-	# Perdu de vue depuis longtemps → aller à la dernière position connue
-	if time_since_last_seen > 8.0 and not can_see_player():
-		current_state = CombatState.HOLD_POSITION
-		hold_timer = 0.0
-		hold_duration = randf_range(5.0, 8.0)
-		return
+	# Perdu de vue depuis longtemps → continuer vers la dernière position connue
+	# Ne PAS arrêter d'avancer — aller à last_seen_position puis tenir
+	if time_since_last_seen > 15.0 and not can_see_player():
+		var dist_to_last = global_position.distance_to(last_seen_position)
+		if dist_to_last < 5.0:
+			current_state = CombatState.HOLD_POSITION
+			hold_timer = 0.0
+			hold_duration = randf_range(5.0, 8.0)
+			return
 	
 	# Avancer DIRECTEMENT vers le joueur (pas de point intermédiaire)
 	var target_pos = player.global_position if can_see_player() else last_seen_position
@@ -812,21 +815,28 @@ func die():
 		hit_effect.global_position = global_position + Vector3(0, 1.5, 0)
 		get_tree().current_scene.add_child(hit_effect)
 		hit_effect.emitting = true
+	# Attendre 8 secondes avant de respawn (plus réaliste)
 	if is_inside_tree() and get_tree():
-		await get_tree().create_timer(5.0).timeout
+		await get_tree().create_timer(8.0).timeout
 	respawn()
 
 func respawn():
 	is_dead = false
 	health = 100
 	ammo = max_ammo
-	has_seen_player = false
-	current_state = CombatState.IDLE_PATROL
-	current_patrol_index = 0
+	has_seen_player = true
+	current_state = CombatState.ADVANCE
 	hold_timer = 0.0
 	
-	var offset = Vector3(randf_range(-5, 5), 0, randf_range(-5, 5))
+	# Respawn à une position aléatoire AUTOUR de la position initiale (pas au même endroit)
+	var angle = randf() * PI * 2.0
+	var dist = randf_range(10.0, 25.0)
+	var offset = Vector3(cos(angle) * dist, 0, sin(angle) * dist)
 	global_position = initial_position + offset
 	_snap_to_ground()
 	velocity = Vector3.ZERO
+	
+	# Regénérer les points de patrouille autour de la nouvelle position
+	initial_position = global_position
+	_generate_patrol_points()
 	_play_anim_continuous(anim_idle, "idle")
