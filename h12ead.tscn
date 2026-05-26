@@ -15,6 +15,8 @@ height = 1.9135742
 [node name="Edo_Kpessé" type="CharacterBody3D" parent="." unique_id=295509368]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.9963211, 0, 0.002301693)
 collision_layer = 2
+collision_mask = 1
+floor_snap_length = 1.0
 script = ExtResource("2_845wx")
 
 [node name="Model" parent="Edo_Kpessé" unique_id=634299524 instance=ExtResource("1_f41lm")]

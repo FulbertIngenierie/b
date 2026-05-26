@@ -69,6 +69,7 @@
 [ext_resource type="PackedScene" path="res://Edo_Kpessé.tscn" id="68_edo_scene"]
 [ext_resource type="PackedScene" uid="uid://duel_hud" path="res://DuelHUD.tscn" id="69_hud"]
 [ext_resource type="PackedScene" uid="uid://crosshair" path="res://Crosshair.tscn" id="70_crosshair"]
+[ext_resource type="PackedScene" uid="uid://pause_menu" path="res://PauseMenu.tscn" id="71_pause_menu"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_l2x6l"]
 albedo_texture = ExtResource("3_0yo45")
@@ -5718,20 +5719,22 @@ shape = SubResource("CapsuleShape3D_fo65l")
 
 [node name="Crosshair" parent="CanvasLayer" instance=ExtResource("70_crosshair")]
 
+[node name="PauseMenu" parent="CanvasLayer" instance=ExtResource("71_pause_menu")]
+
 [node name="Head" parent="." unique_id=1376506799 instance=ExtResource("67_sqnuf")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.23196828, -1.2364808)
 
 [node name="Edo_Kpessé2" parent="Head" unique_id=295509368 instance=ExtResource("68_edo_scene")]
-transform = Transform3D(2.153454, 0, 0, 0, 1.6304169, 0, 0, 0, 1, -3.5190413, 0, -15.86894)
+transform = Transform3D(1.5, 0, 0, 0, 1.5, 0, 0, 0, 1.5, -3.5190413, 0, -15.86894)
 
 [node name="AudioStreamPlayer3D" parent="Head" index="3" unique_id=218812133]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.0011477, 2.7173195, -15.214222)
 
 [node name="Edo_Kpessé3" parent="Head" unique_id=1171459371 instance=ExtResource("68_edo_scene")]
-transform = Transform3D(2.153454, 0, 0, 0, 1.6304169, 0, 0, 0, 1, -21.904774, 0, -15.86894)
+transform = Transform3D(1.5, 0, 0, 0, 1.5, 0, 0, 0, 1.5, -21.904774, 0, -15.86894)
 
 [node name="Edo_Kpessé4" parent="Head" unique_id=826987367 instance=ExtResource("68_edo_scene")]
-transform = Transform3D(2.153454, 0, 0, 0, 1.6304169, 0, 0, 0, 1, 1.8899038, 0, -36.381046)
+transform = Transform3D(1.5, 0, 0, 0, 1.5, 0, 0, 0, 1.5, 1.8899038, 0, -36.381046)
 
 [editable path="House_Colliders"]
 [editable path="Node3D/brick_wall"]

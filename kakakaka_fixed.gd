@@ -141,6 +141,9 @@ func _input(event):
 
 	if is_dead:
 		return
+	
+	if get_tree().paused:
+		return
 
 	# =====================================================
 	# CAMERA - Stocker les mouvements de souris
@@ -161,11 +164,9 @@ func _input(event):
 
 			update_animation()
 			
-			# Mettre à jour le crosshair
 			if crosshair:
 				crosshair.set_aiming(is_aiming)
 			
-			# Cibler automatiquement l'ennemi le plus proche dans la zone de visée
 			if is_aiming:
 				aim_at_nearest_enemy()
 
@@ -401,28 +402,35 @@ func aim_at_nearest_enemy():
 	
 	var nearest_enemy = null
 	var nearest_distance = detection_range
+	var camera_direction = -camera.global_transform.basis.z.normalized()
 	
 	for enemy in enemies:
 		if not enemy or not is_instance_valid(enemy):
 			continue
+		if "is_dead" in enemy and enemy.is_dead:
+			continue
 		
-		var distance = global_position.distance_to(enemy.global_position)
-		if distance < nearest_distance:
-			# Vérifier si l'ennemi est dans la zone de visée
-			var direction_to_enemy = (enemy.global_position - global_position).normalized()
-			var camera_direction = -camera.global_transform.basis.z.normalized()
-			
-			var dot_product = direction_to_enemy.dot(camera_direction)
-			if dot_product > 0.5:  # Dans un cône de 60 degrés
-				nearest_distance = distance
-				nearest_enemy = enemy
+		var enemy_center = enemy.global_position + Vector3(0, 1.2, 0)
+		var distance = global_position.distance_to(enemy_center)
+		if distance > nearest_distance:
+			continue
+		
+		var direction_to_enemy = (enemy_center - camera.global_position).normalized()
+		var dot_product = direction_to_enemy.dot(camera_direction)
+		if dot_product > 0.7:
+			nearest_distance = distance
+			nearest_enemy = enemy
 	
 	if nearest_enemy:
-		# Tourner la caméra vers l'ennemi
-		var direction = (nearest_enemy.global_position - global_position).normalized()
-		var target_angle = atan2(direction.x, direction.z)
-		yaw = target_angle
+		var enemy_center = nearest_enemy.global_position + Vector3(0, 1.2, 0)
+		var direction = (enemy_center - camera.global_position).normalized()
+		
+		yaw = atan2(direction.x, direction.z)
+		pitch = -asin(direction.y)
+		pitch = clamp(pitch, -1.5, 1.5)
+		
 		rotation.y = yaw
+		rotation.x = pitch
 
 # =========================================================
 # SHOOT ONCE
