@@ -62,10 +62,7 @@ var is_sprinting := false
 # CAMÉRA 3ÈME / 1ÈRE PERSONNE
 # =========================================================
 
-var is_first_person := false
-var cam_offset_3rd := Vector3(0.8, 2.5, 4.0)
-var cam_offset_1st := Vector3(0, 0, 0)
-var cam_lerp_speed := 12.0
+# Caméra 1ère personne (classique FPS avec AK-47 visible)
 
 # =========================================================
 # ARMES
@@ -208,8 +205,6 @@ func _ready():
 	_create_weapon_label()
 	_create_grenade_label()
 	
-	# Commencer en 3ème personne
-	_set_camera_mode(false)
 	_switch_weapon(0)
 
 # =========================================================
@@ -265,11 +260,6 @@ func _input(event):
 			if event.pressed:
 				reload_once()
 		
-		# T = basculer caméra 1ère/3ème personne
-		if event.keycode == KEY_T:
-			if event.pressed:
-				is_first_person = !is_first_person
-				_set_camera_mode(is_first_person)
 		
 		# 1/2 = changer d'arme
 		if event.keycode == KEY_1:
@@ -401,8 +391,6 @@ func _process(delta):
 	if grenade_label:
 		grenade_label.text = "GRENADES: " + str(grenades)
 	
-	# Camera 3ème personne smooth
-	_update_camera_position(delta)
 
 	update_animation()
 
@@ -940,22 +928,7 @@ func _update_death_screen(_delta):
 var weapon_label: Label = null
 var grenade_label: Label = null
 
-func _set_camera_mode(first_person: bool):
-	is_first_person = first_person
-	var char_model = get_node_or_null("CharacterModel")
-	if char_model:
-		char_model.visible = !first_person
-	if camera:
-		if first_person:
-			camera.position = cam_offset_1st
-		else:
-			camera.position = cam_offset_3rd
 
-func _update_camera_position(delta):
-	if not camera:
-		return
-	var target_offset = cam_offset_1st if is_first_person else cam_offset_3rd
-	camera.position = camera.position.lerp(target_offset, cam_lerp_speed * delta)
 
 # =========================================================
 # CHANGEMENT D'ARME

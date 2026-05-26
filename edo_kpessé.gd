@@ -364,12 +364,14 @@ func _find_best_cover() -> Vector3:
 func _handle_idle_patrol(delta):
 	if has_seen_player:
 		current_state = CombatState.ADVANCE
+		velocity.x = 0
+		velocity.z = 0
 		return
 	
 	if patrol_points.is_empty():
 		_play_anim_continuous(anim_idle, "idle")
-		velocity.x = 0
-		velocity.z = 0
+		velocity.x = lerp(velocity.x, 0.0, clamp(velocity_smoothing * delta, 0.0, 1.0))
+		velocity.z = lerp(velocity.z, 0.0, clamp(velocity_smoothing * delta, 0.0, 1.0))
 		return
 	
 	var target = patrol_points[current_patrol_index]
@@ -378,9 +380,11 @@ func _handle_idle_patrol(delta):
 	
 	if dist < 2.0:
 		patrol_wait_timer += delta
-		velocity.x = 0
-		velocity.z = 0
+		velocity.x = lerp(velocity.x, 0.0, clamp(velocity_smoothing * delta, 0.0, 1.0))
+		velocity.z = lerp(velocity.z, 0.0, clamp(velocity_smoothing * delta, 0.0, 1.0))
 		_play_anim_continuous(anim_idle, "idle")
+		if anim_player:
+			anim_player.speed_scale = 1.0
 		if patrol_wait_timer >= patrol_wait_time:
 			patrol_wait_timer = 0.0
 			current_patrol_index = (current_patrol_index + 1) % patrol_points.size()
@@ -388,10 +392,14 @@ func _handle_idle_patrol(delta):
 		var direction = (target - global_position)
 		direction.y = 0
 		direction = direction.normalized()
-		velocity.x = direction.x * speed
-		velocity.z = direction.z * speed
+		var target_vx = direction.x * speed
+		var target_vz = direction.z * speed
+		velocity.x = lerp(velocity.x, target_vx, clamp(velocity_smoothing * delta, 0.0, 1.0))
+		velocity.z = lerp(velocity.z, target_vz, clamp(velocity_smoothing * delta, 0.0, 1.0))
 		_face_direction(direction)
 		_play_anim_continuous(anim_walk, "walk")
+		if anim_player:
+			anim_player.speed_scale = clamp(velocity.length() / speed, 0.5, 1.5)
 
 # =========================================================
 # ÉTAT 2: AVANCER — directement vers le joueur
@@ -408,8 +416,6 @@ func _handle_advance(delta, distance_to_player):
 	
 	# Arrivé à portée de tir → s'arrêter et tenir la position
 	if distance_to_player <= stop_distance:
-		velocity.x = 0
-		velocity.z = 0
 		current_state = CombatState.HOLD_POSITION
 		hold_timer = 0.0
 		hold_duration = randf_range(10.0, 15.0)
@@ -417,8 +423,6 @@ func _handle_advance(delta, distance_to_player):
 	
 	# Perdu de vue depuis longtemps → aller à la dernière position connue
 	if time_since_last_seen > 8.0 and not can_see_player():
-		velocity.x = 0
-		velocity.z = 0
 		current_state = CombatState.HOLD_POSITION
 		hold_timer = 0.0
 		hold_duration = randf_range(5.0, 8.0)
@@ -435,10 +439,14 @@ func _handle_advance(delta, distance_to_player):
 		velocity.x = lerp(velocity.x, target_vx, clamp(velocity_smoothing * delta, 0.0, 1.0))
 		velocity.z = lerp(velocity.z, target_vz, clamp(velocity_smoothing * delta, 0.0, 1.0))
 		_play_anim_continuous(anim_run, "run")
+		if anim_player:
+			anim_player.speed_scale = clamp(velocity.length() / run_speed, 0.5, 1.5)
 	else:
 		velocity.x = lerp(velocity.x, 0.0, clamp(velocity_smoothing * delta, 0.0, 1.0))
 		velocity.z = lerp(velocity.z, 0.0, clamp(velocity_smoothing * delta, 0.0, 1.0))
 		_play_anim_continuous(anim_idle, "idle")
+		if anim_player:
+			anim_player.speed_scale = 1.0
 
 # =========================================================
 # ÉTAT 3: TENIR POSITION — rester et tirer 10-15s
@@ -449,14 +457,16 @@ func _handle_hold_position(delta, distance_to_player):
 		return
 	
 	_face_player()
-	velocity.x = 0
-	velocity.z = 0
+	velocity.x = lerp(velocity.x, 0.0, clamp(velocity_smoothing * delta, 0.0, 1.0))
+	velocity.z = lerp(velocity.z, 0.0, clamp(velocity_smoothing * delta, 0.0, 1.0))
 	
 	if can_see_player() and can_shoot:
 		shoot_at_player()
 		_play_anim_continuous(anim_shoot, "shoot")
 	else:
 		_play_anim_continuous(anim_idle, "idle")
+	if anim_player:
+		anim_player.speed_scale = 1.0
 	
 	hold_timer += delta
 	
@@ -493,13 +503,17 @@ func _handle_cover(delta):
 		var direction = (cover_position - global_position)
 		direction.y = 0
 		direction = direction.normalized()
-		velocity.x = direction.x * run_speed
-		velocity.z = direction.z * run_speed
+		var target_vx = direction.x * run_speed
+		var target_vz = direction.z * run_speed
+		velocity.x = lerp(velocity.x, target_vx, clamp(velocity_smoothing * delta, 0.0, 1.0))
+		velocity.z = lerp(velocity.z, target_vz, clamp(velocity_smoothing * delta, 0.0, 1.0))
 		_face_player()
 		_play_anim_continuous(anim_run, "run")
+		if anim_player:
+			anim_player.speed_scale = clamp(velocity.length() / run_speed, 0.5, 1.5)
 	else:
-		velocity.x = 0
-		velocity.z = 0
+		velocity.x = lerp(velocity.x, 0.0, clamp(velocity_smoothing * delta, 0.0, 1.0))
+		velocity.z = lerp(velocity.z, 0.0, clamp(velocity_smoothing * delta, 0.0, 1.0))
 		is_behind_cover = true
 		_face_player()
 		
@@ -534,7 +548,8 @@ func _pick_flank_target():
 	flank_target = global_position + flank_dir * randf_range(5, 10) + to_player * randf_range(2, 5)
 	flank_target.y = global_position.y
 
-func _handle_flank(_delta, _distance_to_player):
+func _handle_flank(delta, _distance_to_player):
+	var _delta = delta
 	if not player:
 		return
 	
@@ -553,20 +568,22 @@ func _handle_flank(_delta, _distance_to_player):
 		current_state = CombatState.HOLD_POSITION
 		hold_timer = 0.0
 		hold_duration = randf_range(10.0, 15.0)
-		velocity.x = 0
-		velocity.z = 0
 		return
 	
 	var direction = (flank_target - global_position)
 	direction.y = 0
 	if direction.length() > 0.5:
 		direction = direction.normalized()
-		velocity.x = direction.x * run_speed
-		velocity.z = direction.z * run_speed
+		var target_vx = direction.x * run_speed
+		var target_vz = direction.z * run_speed
+		velocity.x = lerp(velocity.x, target_vx, clamp(velocity_smoothing * _delta, 0.0, 1.0))
+		velocity.z = lerp(velocity.z, target_vz, clamp(velocity_smoothing * _delta, 0.0, 1.0))
 		_play_anim_continuous(anim_run, "run")
+		if anim_player:
+			anim_player.speed_scale = clamp(velocity.length() / run_speed, 0.5, 1.5)
 	else:
-		velocity.x = 0
-		velocity.z = 0
+		velocity.x = lerp(velocity.x, 0.0, clamp(velocity_smoothing * _delta, 0.0, 1.0))
+		velocity.z = lerp(velocity.z, 0.0, clamp(velocity_smoothing * _delta, 0.0, 1.0))
 
 # =========================================================
 # ROTATION
