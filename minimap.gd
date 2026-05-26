@@ -1,7 +1,7 @@
 extends Control
 
 # =========================================================
-# RADAR FPS — affiche tous les ennemis sur le radar
+# RADAR FPS — AKA_FPK — radar moderne
 # =========================================================
 
 @onready var player_dot = $PlayerDot
@@ -13,6 +13,8 @@ var player: CharacterBody3D
 
 var enemy_dots: Array = []
 var enemy_dot_glows: Array = []
+var sweep_angle := 0.0
+var sweep_speed := 2.0
 
 func _ready():
 	find_player()
@@ -24,10 +26,14 @@ func _remove_old_dots():
 	if has_node("EnemyDotGlow"):
 		$EnemyDotGlow.queue_free()
 
-func _process(_delta):
+func _process(delta):
 	if not player or not is_instance_valid(player):
 		find_player()
 		return
+	
+	sweep_angle += sweep_speed * delta
+	if sweep_angle > TAU:
+		sweep_angle -= TAU
 	
 	update_radar()
 
@@ -74,7 +80,6 @@ func update_radar():
 			enemy_dot_glows[i].visible = false
 			continue
 		
-		# Rotation relative au joueur
 		var rel_x = offset_3d.x * cos(player_yaw) + offset_3d.z * sin(player_yaw)
 		var rel_z = -offset_3d.x * sin(player_yaw) + offset_3d.z * cos(player_yaw)
 		
@@ -88,6 +93,15 @@ func update_radar():
 		enemy_dot_glows[i].position = dot_pos - enemy_dot_glows[i].size / 2.0
 		enemy_dots[i].visible = true
 		enemy_dot_glows[i].visible = true
+		
+		# Pulse effect for close enemies
+		var pulse = (sin(sweep_angle * 3.0) + 1.0) / 2.0
+		if distance < 20.0:
+			enemy_dots[i].color = Color(1, 0.1, 0.1, 0.8 + pulse * 0.2)
+			enemy_dot_glows[i].color = Color(1, 0.1, 0.1, 0.3 + pulse * 0.2)
+		else:
+			enemy_dots[i].color = Color(1, 0.3, 0.1, 0.9)
+			enemy_dot_glows[i].color = Color(1, 0.3, 0.1, 0.3)
 
 func _sync_dot_count(count: int):
 	while enemy_dots.size() < count:
