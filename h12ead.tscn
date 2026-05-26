@@ -3,6 +3,7 @@
 [ext_resource type="PackedScene" uid="uid://dikjc3v7uc6xj" path="res://Edo_Kpessé.glb" id="1_f41lm"]
 [ext_resource type="Script" uid="uid://bu4dwps6c2lo7" path="res://edo_kpessé.gd" id="2_845wx"]
 [ext_resource type="PackedScene" uid="uid://pxe6g8vamj2a" path="res://mon fusil.glb" id="3_0skpm"]
+[ext_resource type="AudioStream" uid="uid://bsdyscdy50n8e" path="res://GUNPis_Coup de feu de 357 magnum 9 mm (ID 0438)_LaSonotheque.fr.ogg" id="4_gun_sound"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_a0tk4"]
 height = 1.9135742
@@ -13,6 +14,7 @@ height = 1.9135742
 
 [node name="Edo_Kpessé" type="CharacterBody3D" parent="." unique_id=295509368]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.9963211, 0, 0.002301693)
+collision_layer = 2
 script = ExtResource("2_845wx")
 
 [node name="Model" parent="Edo_Kpessé" unique_id=634299524 instance=ExtResource("1_f41lm")]
@@ -20,18 +22,14 @@ script = ExtResource("2_845wx")
 [node name="AnimationPlayer" type="AnimationPlayer" parent="Edo_Kpessé"]
 
 [node name="ShootSound" type="AudioStreamPlayer3D" parent="Edo_Kpessé"]
+stream = ExtResource("4_gun_sound")
+volume_db = 10.0
+max_distance = 200.0
+attenuation_model = 1
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Edo_Kpessé" unique_id=529464621]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.305045, 0.75479233, 0.9201145)
 shape = SubResource("CapsuleShape3D_a0tk4")
-
-[node name="GunTip" type="Area3D" parent="." unique_id=1326085140]
-transform = Transform3D(3.5782108, 0, 0, 0, 2.1818147, 0, 0, 0, 1.263257, -1.8139355, 1.3781538, 1.3878717)
-audio_bus_override = true
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="GunTip" unique_id=651379313]
-transform = Transform3D(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-shape = SubResource("SphereShape3D_r3fl7")
 
 [node name="AudioStreamPlayer3D" type="AudioStreamPlayer3D" parent="." unique_id=218812133]
 

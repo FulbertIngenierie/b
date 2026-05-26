@@ -1,7 +1,7 @@
 extends Control
 
 # =========================================================
-# NODES
+# HUD FPS — Vie, munitions, ennemis restants
 # =========================================================
 
 @onready var player_health_label = $PlayerPanel/PlayerHealthLabel
@@ -12,79 +12,56 @@ extends Control
 @onready var enemy_health_bar = $EnemyPanel/EnemyHealthBar
 @onready var enemy_ammo_label = $EnemyPanel/EnemyAmmoLabel
 
-# =========================================================
-# VARIABLES
-# =========================================================
-
 var player: CharacterBody3D
-var enemy: CharacterBody3D
-
-# =========================================================
-# READY
-# =========================================================
 
 func _ready():
-	find_player_and_enemy()
+	find_player()
 	update_hud()
-
-# =========================================================
-# PROCESS
-# =========================================================
 
 func _process(_delta):
-	if not player or not enemy:
-		find_player_and_enemy()
-	
+	if not player or not is_instance_valid(player):
+		find_player()
 	update_hud()
 
-# =========================================================
-# TROUVER JOUEUR ET ENNEMI
-# =========================================================
-
-func find_player_and_enemy():
+func find_player():
 	var players = get_tree().get_nodes_in_group("player")
 	if players.size() > 0:
 		player = players[0]
-	
-	var enemies = get_tree().get_nodes_in_group("enemy_target")
-	if enemies.size() > 0:
-		enemy = enemies[0]
-
-# =========================================================
-# UPDATE HUD
-# =========================================================
 
 func update_hud():
-	# Mise à jour joueur
-	if player:
+	if player and is_instance_valid(player):
+		var hp = 100
 		if player.has_method("get_health"):
-			var player_health = player.get_health()
-			player_health_label.text = "VIE: " + str(player_health)
-			player_health_bar.value = player_health
+			hp = player.get_health()
+		elif "health" in player:
+			hp = player.health
+		player_health_label.text = "VIE: " + str(hp)
+		player_health_bar.value = hp
 		
+		var am = 30
 		if player.has_method("get_ammo"):
-			var player_ammo = player.get_ammo()
-			player_ammo_label.text = "MUNITIONS: " + str(player_ammo)
-		else:
-			# Si le joueur n'a pas de système de munitions, afficher infini
-			player_ammo_label.text = "MUNITIONS: ∞"
+			am = player.get_ammo()
+		elif "ammo" in player:
+			am = player.ammo
+		player_ammo_label.text = "MUNITIONS: " + str(am)
 	
-	# Mise à jour ennemi
-	if enemy:
-		if enemy.has_method("get_health"):
-			var enemy_health = enemy.get_health()
-			enemy_health_label.text = "VIE: " + str(enemy_health)
-			enemy_health_bar.value = enemy_health
-		else:
-			# Accès direct à la variable health
-			if "health" in enemy:
-				enemy_health_label.text = "VIE: " + str(enemy.health)
-				enemy_health_bar.value = enemy.health
-		
-		if enemy.has_method("get_ammo"):
-			var enemy_ammo = enemy.get_ammo()
-			enemy_ammo_label.text = "MUNITIONS: " + str(enemy_ammo)
-		else:
-			# Accès direct à la variable ammo
-			if "ammo" in enemy:
-				enemy_ammo_label.text = "MUNITIONS: " + str(enemy.ammo)
+	var enemies = get_tree().get_nodes_in_group("enemies")
+	var alive_count := 0
+	var total_hp := 0
+	for e in enemies:
+		if not is_instance_valid(e):
+			continue
+		var dead = false
+		if "is_dead" in e:
+			dead = e.is_dead
+		if not dead:
+			alive_count += 1
+			if "health" in e:
+				total_hp += e.health
+	
+	enemy_health_label.text = "ENNEMIS: " + str(alive_count)
+	if alive_count > 0:
+		enemy_health_bar.value = float(total_hp) / float(alive_count)
+	else:
+		enemy_health_bar.value = 0
+	enemy_ammo_label.text = "RESTANTS: " + str(alive_count) + "/4"

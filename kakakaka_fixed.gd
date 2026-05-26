@@ -12,6 +12,7 @@ extends CharacterBody3D
 @onready var gun_sound = $GunSound
 
 var damage_sound: AudioStreamPlayer3D = null
+var damage_overlay: ColorRect = null
 
 var damage_flash_timer := 0.0
 var camera_shake_intensity := 0.0
@@ -128,6 +129,9 @@ func _ready():
 	add_child(damage_sound)
 	damage_sound.volume_db = 0.0
 	damage_sound.max_distance = 50.0
+	
+	# Créer l'overlay de dégâts (écran rouge)
+	_create_damage_overlay()
 
 # =========================================================
 # INPUT
@@ -263,14 +267,13 @@ func _process(delta):
 
 	if damage_flash_timer > 0:
 		damage_flash_timer -= delta
-		var flash_alpha = damage_flash_timer / 0.3
-		if camera.environment:
-			camera.environment.vignette_intensity = flash_alpha * 2.0
-			camera.environment.tonemap_exposure = 1.0 - flash_alpha * 0.5
+		var flash_alpha = clamp(damage_flash_timer / 0.3, 0.0, 1.0)
+		if damage_overlay:
+			damage_overlay.color = Color(0.8, 0.0, 0.0, flash_alpha * 0.4)
+			damage_overlay.visible = true
 	else:
-		if camera.environment:
-			camera.environment.vignette_intensity = 0.0
-			camera.environment.tonemap_exposure = 1.0
+		if damage_overlay:
+			damage_overlay.visible = false
 
 	# =====================================================
 	# CAMERA SHAKE EFFECT
@@ -761,18 +764,17 @@ func play_idle():
 # =========================================================
 
 func take_damage(amount):
-
 	health -= amount
 
-	# Effet de flash rouge sur l'écran
-	damage_flash_timer = 0.3
+	# Effet de flash rouge vif
+	damage_flash_timer = 0.4
 
-	# Effet de caméra secouée
-	camera_shake_intensity = 0.5
+	# Effet de caméra secouée (intensité proportionnelle aux dégâts)
+	camera_shake_intensity = clamp(float(amount) / 20.0, 0.3, 1.5)
 
-	# Son de gémissement
+	# Son de dégâts
 	if damage_sound:
-		damage_sound.pitch_scale = randf_range(0.9, 1.1)
+		damage_sound.pitch_scale = randf_range(0.8, 1.2)
 		if damage_sound.playing:
 			damage_sound.stop()
 		damage_sound.play()
@@ -786,7 +788,6 @@ func take_damage(amount):
 		hit_effect.one_shot = true
 
 	if health <= 0:
-
 		die()
 
 # =========================================================
@@ -819,13 +820,29 @@ func check_enemies_alive():
 	var alive_count = 0
 	
 	for enemy in enemies:
-		if enemy.has_method("get_health"):
-			if enemy.get_health() > 0:
-				alive_count += 1
-		elif "health" in enemy:
-			if enemy.health > 0:
-				alive_count += 1
+		if not is_instance_valid(enemy):
+			continue
+		var dead = false
+		if "is_dead" in enemy:
+			dead = enemy.is_dead
+		if not dead:
+			alive_count += 1
 	
-	# Si tous les ennemis sont morts, afficher l'écran de victoire
 	if alive_count == 0 and enemies.size() > 0:
 		get_tree().change_scene_to_file("res://GameOver.tscn")
+
+func _create_damage_overlay():
+	var canvas = get_tree().current_scene.get_node_or_null("CanvasLayer")
+	if not canvas:
+		canvas = CanvasLayer.new()
+		canvas.name = "DamageCanvas"
+		canvas.layer = 100
+		get_tree().current_scene.add_child(canvas)
+	
+	damage_overlay = ColorRect.new()
+	damage_overlay.name = "DamageOverlay"
+	damage_overlay.color = Color(0.8, 0.0, 0.0, 0.0)
+	damage_overlay.anchors_preset = Control.PRESET_FULL_RECT
+	damage_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	damage_overlay.visible = false
+	canvas.add_child(damage_overlay)

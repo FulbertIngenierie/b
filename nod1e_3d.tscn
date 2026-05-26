@@ -67,6 +67,8 @@
 [ext_resource type="PackedScene" path="res://WarAmbience.tscn" id="62_war_ambience"]
 [ext_resource type="PackedScene" uid="uid://ts2ursc3jpkj" path="res://h12ead.tscn" id="67_sqnuf"]
 [ext_resource type="PackedScene" path="res://Edo_Kpessé.tscn" id="68_edo_scene"]
+[ext_resource type="PackedScene" uid="uid://duel_hud" path="res://DuelHUD.tscn" id="69_hud"]
+[ext_resource type="PackedScene" uid="uid://crosshair" path="res://Crosshair.tscn" id="70_crosshair"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_l2x6l"]
 albedo_texture = ExtResource("3_0yo45")
@@ -1454,9 +1456,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.29216766, 0, 0)
 
 [node name="WarAmbience" parent="." unique_id=2000000003 instance=ExtResource("62_war_ambience")]
 
-[node name="Zombie" parent="." unique_id=2000000007 instance=ExtResource("31_zombie")]
-transform = Transform3D(-0.029971741, 0, -0.001301783, 0, 0.03, 0, 0.001301783, 0, -0.029971741, -0.2363472, 0, 7.830229)
-script = null
+
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=704159794]
 transform = Transform3D(80, 0, 0, 0, 50, 0, 0, 0, 50, 0, 0, 0)
@@ -5706,65 +5706,6 @@ bones/98/rotation = Quaternion(0.28839824, 0.107805826, -0.028316211, 0.9510008)
 bones/99/rotation = Quaternion(0.32856044, -0.002379073, -0.010162447, 0.9444253)
 bones/105/position = Vector3(-0.04980415, -99.99999, 159.83858)
 
-[node name="EnemyFPS" parent="Sketchfab_Scene/Sketchfab_model/fbx_merge_fbx" parent_id_path=PackedInt32Array(1344164034, 4685072) index="1" unique_id=1435971001 instance=ExtResource("59_hhqkn")]
-transform = Transform3D(37.37943, 0, 0, 0, 50.167953, 1.8932191e-14, 0, -1.1139523e-14, 85.26301, -194.15417, -68.35892, 250.50586)
-script = null
-
-[node name="Object_2" parent="Sketchfab_Scene/Sketchfab_model/fbx_merge_fbx/EnemyFPS/SoldierModel/Sketchfab_model/us_assault_obj_cleaner_materialmerger_gles" parent_id_path=PackedInt32Array(1435971001, 517946364, 388765820) index="0" unique_id=1611612183]
-visible = false
-
-[node name="Object_3" parent="Sketchfab_Scene/Sketchfab_model/fbx_merge_fbx/EnemyFPS/SoldierModel/Sketchfab_model/us_assault_obj_cleaner_materialmerger_gles" parent_id_path=PackedInt32Array(1435971001, 517946364, 388765820) index="1" unique_id=885254004]
-visible = false
-
-[node name="Object_4" parent="Sketchfab_Scene/Sketchfab_model/fbx_merge_fbx/EnemyFPS/SoldierModel/Sketchfab_model/us_assault_obj_cleaner_materialmerger_gles" parent_id_path=PackedInt32Array(1435971001, 517946364, 388765820) index="2" unique_id=1589017315]
-visible = false
-
-[node name="Object_5" parent="Sketchfab_Scene/Sketchfab_model/fbx_merge_fbx/EnemyFPS/SoldierModel/Sketchfab_model/us_assault_obj_cleaner_materialmerger_gles" parent_id_path=PackedInt32Array(1435971001, 517946364, 388765820) index="3" unique_id=1098070759]
-visible = false
-
-[node name="Object_6" parent="Sketchfab_Scene/Sketchfab_model/fbx_merge_fbx/EnemyFPS/SoldierModel/Sketchfab_model/us_assault_obj_cleaner_materialmerger_gles" parent_id_path=PackedInt32Array(1435971001, 517946364, 388765820) index="4" unique_id=2096793050]
-visible = false
-
-[node name="Object_7" parent="Sketchfab_Scene/Sketchfab_model/fbx_merge_fbx/EnemyFPS/SoldierModel/Sketchfab_model/us_assault_obj_cleaner_materialmerger_gles" parent_id_path=PackedInt32Array(1435971001, 517946364, 388765820) index="5" unique_id=54584410]
-visible = false
-
-[node name="Object_8" parent="Sketchfab_Scene/Sketchfab_model/fbx_merge_fbx/EnemyFPS/SoldierModel/Sketchfab_model/us_assault_obj_cleaner_materialmerger_gles" parent_id_path=PackedInt32Array(1435971001, 517946364, 388765820) index="6" unique_id=1098949494]
-visible = false
-
-[node name="Object_9" parent="Sketchfab_Scene/Sketchfab_model/fbx_merge_fbx/EnemyFPS/SoldierModel/Sketchfab_model/us_assault_obj_cleaner_materialmerger_gles" parent_id_path=PackedInt32Array(1435971001, 517946364, 388765820) index="7" unique_id=126917525]
-visible = false
-
-[node name="Object_10" parent="Sketchfab_Scene/Sketchfab_model/fbx_merge_fbx/EnemyFPS/SoldierModel/Sketchfab_model/us_assault_obj_cleaner_materialmerger_gles" parent_id_path=PackedInt32Array(1435971001, 517946364, 388765820) index="8" unique_id=986782057]
-visible = false
-
-[node name="Object_11" parent="Sketchfab_Scene/Sketchfab_model/fbx_merge_fbx/EnemyFPS/SoldierModel/Sketchfab_model/us_assault_obj_cleaner_materialmerger_gles" parent_id_path=PackedInt32Array(1435971001, 517946364, 388765820) index="9" unique_id=1647129591]
-visible = false
-
-[node name="Object_12" parent="Sketchfab_Scene/Sketchfab_model/fbx_merge_fbx/EnemyFPS/SoldierModel/Sketchfab_model/us_assault_obj_cleaner_materialmerger_gles" parent_id_path=PackedInt32Array(1435971001, 517946364, 388765820) index="10" unique_id=2041813798]
-visible = false
-
-[node name="Object_13" parent="Sketchfab_Scene/Sketchfab_model/fbx_merge_fbx/EnemyFPS/SoldierModel/Sketchfab_model/us_assault_obj_cleaner_materialmerger_gles" parent_id_path=PackedInt32Array(1435971001, 517946364, 388765820) index="11" unique_id=949585695]
-visible = false
-
-[node name="Object_14" parent="Sketchfab_Scene/Sketchfab_model/fbx_merge_fbx/EnemyFPS/SoldierModel/Sketchfab_model/us_assault_obj_cleaner_materialmerger_gles" parent_id_path=PackedInt32Array(1435971001, 517946364, 388765820) index="12" unique_id=113428648]
-transform = Transform3D(0.6740701, 0, 0, 0, 0.41101432, 0, 0, 0, 0.43686095, 8.952723, 2.9399743, 1.3987137)
-
-[node name="Object_15" parent="Sketchfab_Scene/Sketchfab_model/fbx_merge_fbx/EnemyFPS/SoldierModel/Sketchfab_model/us_assault_obj_cleaner_materialmerger_gles" parent_id_path=PackedInt32Array(1435971001, 517946364, 388765820) index="13" unique_id=1333543446]
-transform = Transform3D(0.6740701, 0, 0, 0, 0.41101432, 0, 0, 0, 0.43686095, 8.952723, 2.9399743, 1.3987137)
-
-[node name="Object_16" parent="Sketchfab_Scene/Sketchfab_model/fbx_merge_fbx/EnemyFPS/SoldierModel/Sketchfab_model/us_assault_obj_cleaner_materialmerger_gles" parent_id_path=PackedInt32Array(1435971001, 517946364, 388765820) index="14" unique_id=530312689]
-transform = Transform3D(0.6740701, 0, 0, 0, 0.41101432, 0, 0, 0, 0.43686095, 8.952723, 2.9399743, 1.3987137)
-
-[node name="Object_17" parent="Sketchfab_Scene/Sketchfab_model/fbx_merge_fbx/EnemyFPS/SoldierModel/Sketchfab_model/us_assault_obj_cleaner_materialmerger_gles" parent_id_path=PackedInt32Array(1435971001, 517946364, 388765820) index="15" unique_id=1672274860]
-transform = Transform3D(0.52343166, 0, 0, 0, 0.41101432, 0, 0, 0, 0.43686095, 8.215387, 2.9399743, 1.7573875)
-visible = false
-
-[node name="Object_18" parent="Sketchfab_Scene/Sketchfab_model/fbx_merge_fbx/EnemyFPS/SoldierModel/Sketchfab_model/us_assault_obj_cleaner_materialmerger_gles" parent_id_path=PackedInt32Array(1435971001, 517946364, 388765820) index="16" unique_id=992360610]
-transform = Transform3D(0.6740701, 0, 0, 0, 0.41101432, 0, 0, 0, 0.43686095, 8.952723, 2.9399743, 1.3987137)
-
-[node name="Object_19" parent="Sketchfab_Scene/Sketchfab_model/fbx_merge_fbx/EnemyFPS/SoldierModel/Sketchfab_model/us_assault_obj_cleaner_materialmerger_gles" parent_id_path=PackedInt32Array(1435971001, 517946364, 388765820) index="17" unique_id=1241880015]
-transform = Transform3D(0.6740701, 0, 0, 0, 0.41101432, 0, 0, 0, 0.43686095, 8.952723, 2.9399743, 1.3987137)
-
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Sketchfab_Scene" unique_id=302917638]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8527517, 0)
 shape = SubResource("CapsuleShape3D_fo65l")
@@ -5772,6 +5713,10 @@ shape = SubResource("CapsuleShape3D_fo65l")
 [node name="CanvasLayer" type="CanvasLayer" parent="." unique_id=1777539801]
 
 [node name="Minimap" parent="CanvasLayer" unique_id=145893225 instance=ExtResource("30_minimap")]
+
+[node name="DuelHUD" parent="CanvasLayer" instance=ExtResource("69_hud")]
+
+[node name="Crosshair" parent="CanvasLayer" instance=ExtResource("70_crosshair")]
 
 [node name="Head" parent="." unique_id=1376506799 instance=ExtResource("67_sqnuf")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.23196828, -1.2364808)
@@ -5810,8 +5755,6 @@ transform = Transform3D(2.153454, 0, 0, 0, 1.6304169, 0, 0, 0, 1, 1.8899038, 0, 
 [editable path="SpatialGrid/FPSPlayer"]
 [editable path="SpatialGrid/FPSPlayer/CharacterModel"]
 [editable path="Sketchfab_Scene"]
-[editable path="Sketchfab_Scene/Sketchfab_model/fbx_merge_fbx/EnemyFPS"]
-[editable path="Sketchfab_Scene/Sketchfab_model/fbx_merge_fbx/EnemyFPS/SoldierModel"]
 [editable path="Head"]
 [editable path="Head/Edo_Kpessé2"]
 [editable path="Head/Edo_Kpessé"]

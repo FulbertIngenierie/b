@@ -30,7 +30,7 @@ func _ready():
 		area.area_entered.connect(_on_area_entered)
 
 	await get_tree().create_timer(
-		0.15
+		3.0
 	).timeout
 
 	queue_free()
