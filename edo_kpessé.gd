@@ -363,7 +363,6 @@ func _find_best_cover() -> Vector3:
 func _handle_idle_patrol(delta):
 	if has_seen_player:
 		current_state = CombatState.ADVANCE
-		_pick_advance_target()
 		return
 	
 	if patrol_points.is_empty():
