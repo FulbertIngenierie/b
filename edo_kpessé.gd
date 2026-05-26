@@ -49,8 +49,6 @@ var anim_looping := false
 # =========================================================
 
 var gravity := 20.0
-var snap_to_floor := true
-var floor_snap_length := 1.0
 
 # =========================================================
 # PATROL
