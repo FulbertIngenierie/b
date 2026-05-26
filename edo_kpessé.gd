@@ -1,6 +1,13 @@
 extends CharacterBody3D
 
 # =========================================================
+# BEHAVIOR TREE — IA réaliste style militaire
+# =========================================================
+# Arbre de comportement: PERCEVOIR → DÉCIDER → AGIR
+# Pas d'await, pas de téléportation, pas de disparition
+# Un ennemi mort reste au sol définitivement
+
+# =========================================================
 # NODES
 # =========================================================
 
@@ -23,83 +30,107 @@ var hit_effect_scene = preload("res://HitEffect.tscn")
 var bullet_impact_scene = preload("res://BulletImpact.tscn")
 
 # =========================================================
-# VARIABLES
+# STATS
 # =========================================================
 
-var speed := 3.0
-var run_speed := 5.0
+var speed := 2.5
+var run_speed := 4.5
 var detection_range := 80.0
 var attack_range := 45.0
 var damage := 10.0
-var velocity_smoothing := 10.0
-
-var player: CharacterBody3D
-var can_shoot := true
-var fire_rate := 0.2
-var fire_cooldown := 0.0
-var ammo := 30
-var max_ammo := 30
-var health := 100
-var is_dead := false
-var reload_timer := 0.0
-var is_reloading := false
-var death_timer := 0.0
-
-var current_anim := ""
-
-# =========================================================
-# GRAVITY
-# =========================================================
-
 var gravity := 20.0
 
 # =========================================================
-# COMBAT STATE — style Call of Duty
+# ÉTAT INTERNE
 # =========================================================
 
-enum CombatState {
-	IDLE_PATROL,
-	ADVANCE,
-	HOLD_POSITION,
-	COVER,
-	FLANK
-}
-
-var current_state := CombatState.IDLE_PATROL
-var hold_timer := 0.0
-var hold_duration := 12.0
-var flank_target := Vector3.ZERO
-var cover_position := Vector3.ZERO
-var last_seen_position := Vector3.ZERO
-var time_since_last_seen := 0.0
+var player: CharacterBody3D
+var health := 100
+var max_health := 100
+var ammo := 30
+var max_ammo := 30
+var is_dead := false
+var current_anim := ""
 var enemy_id := 0
 var initial_position := Vector3.ZERO
-var has_seen_player := false
-var stop_distance := 15.0
 
 # =========================================================
-# PATROL — avant de voir le joueur
+# TIMERS (AUCUN await — tout par compteur)
+# =========================================================
+
+var can_shoot := true
+var fire_rate := 0.25
+var fire_cooldown := 0.0
+var reload_timer := 0.0
+var is_reloading := false
+
+# =========================================================
+# PERCEPTION — ce que l'ennemi sait du monde
+# =========================================================
+
+var can_see_target := false
+var last_known_position := Vector3.ZERO
+var time_since_seen := 999.0
+var distance_to_target := 999.0
+var has_ever_seen_player := false
+
+# =========================================================
+# BEHAVIOR TREE — états
+# =========================================================
+
+enum BTState {
+	PATROL,         # Patrouille tranquille
+	INVESTIGATE,    # Aller vers dernière position connue
+	ENGAGE_ADVANCE, # Avancer vers le joueur en tirant
+	ENGAGE_HOLD,    # Tenir position et tirer
+	ENGAGE_FLANK,   # Changer de position latérale
+	TAKE_COVER,     # Se mettre à couvert
+	DEAD            # Mort — reste au sol
+}
+
+var bt_state := BTState.PATROL
+var state_timer := 0.0
+
+# =========================================================
+# PATROL
 # =========================================================
 
 var patrol_points: Array[Vector3] = []
 var current_patrol_index := 0
 var patrol_wait_timer := 0.0
-var patrol_wait_time := 12.0
-var patrol_radius := 15.0
+var patrol_wait_time := 8.0
+var patrol_radius := 12.0
 
 # =========================================================
-# OBSTACLES / COUVERTURE
+# ENGAGE
+# =========================================================
+
+var hold_duration := 0.0
+var flank_target := Vector3.ZERO
+var stop_distance := 12.0
+
+# =========================================================
+# COVER
 # =========================================================
 
 var nearby_obstacles: Array = []
 var cover_check_timer := 0.0
-var cover_check_interval := 1.5
-var is_behind_cover := false
+var cover_check_interval := 2.0
+var cover_position := Vector3.ZERO
 var cover_timer := 0.0
-var cover_wait_time := 4.0
+var cover_duration := 4.0
+var is_behind_cover := false
 
 # =========================================================
-# ANIMATION NAMES CACHE
+# SMOOTH MOVEMENT
+# =========================================================
+
+var velocity_smoothing := 8.0
+var rotation_speed := 4.0
+var target_rotation_y := 0.0
+
+# =========================================================
+# ANIMATION CACHE
 # =========================================================
 
 var anim_idle := ""
@@ -111,13 +142,6 @@ var anim_reload := ""
 var anim_die := ""
 var anim_crouch := ""
 var all_anims: PackedStringArray = []
-
-# =========================================================
-# SMOOTH ROTATION
-# =========================================================
-
-var rotation_speed := 5.0
-var target_rotation_y := 0.0
 
 # =========================================================
 # READY
@@ -139,7 +163,637 @@ func _ready():
 	if anim_player:
 		_ensure_animations_loop()
 	
-	_play_anim_continuous(anim_idle, "idle")
+	_play_anim("idle", anim_idle)
+
+# =========================================================
+# PHYSICS PROCESS — BEHAVIOR TREE TICK
+# =========================================================
+
+func _physics_process(delta):
+	# --- Timers globaux (jamais d'await) ---
+	_update_timers(delta)
+	
+	# --- MORT: ne rien faire, rester au sol ---
+	if is_dead:
+		velocity = Vector3.ZERO
+		return
+	
+	# --- Gravité ---
+	if not is_on_floor():
+		velocity.y -= gravity * delta
+	else:
+		velocity.y = 0
+	
+	# --- Trouver le joueur ---
+	if not player:
+		find_player()
+	
+	# ========== ÉTAPE 1: PERCEVOIR ==========
+	_perceive(delta)
+	
+	# ========== ÉTAPE 2: DÉCIDER ==========
+	_decide()
+	
+	# ========== ÉTAPE 3: AGIR ==========
+	_act(delta)
+	
+	# --- Appliquer rotation lisse ---
+	_apply_smooth_rotation(delta)
+	
+	# --- Appliquer mouvement ---
+	move_and_slide()
+
+# =========================================================
+# TIMERS
+# =========================================================
+
+func _update_timers(delta):
+	if fire_cooldown > 0:
+		fire_cooldown -= delta
+		if fire_cooldown <= 0:
+			can_shoot = true
+	
+	if is_reloading:
+		reload_timer -= delta
+		if reload_timer <= 0:
+			is_reloading = false
+			ammo = max_ammo
+	
+	state_timer += delta
+
+# =========================================================
+# ÉTAPE 1: PERCEVOIR — observer le monde
+# =========================================================
+
+func _perceive(delta):
+	if not player or not is_instance_valid(player):
+		can_see_target = false
+		distance_to_target = 999.0
+		return
+	
+	distance_to_target = global_position.distance_to(player.global_position)
+	
+	# Raycast pour vérifier la ligne de vue
+	var sees_now = _check_line_of_sight()
+	
+	if sees_now:
+		can_see_target = true
+		last_known_position = player.global_position
+		time_since_seen = 0.0
+		has_ever_seen_player = true
+	else:
+		can_see_target = false
+		time_since_seen += delta
+
+# =========================================================
+# ÉTAPE 2: DÉCIDER — choisir l'action
+# =========================================================
+
+func _decide():
+	match bt_state:
+		BTState.DEAD:
+			return
+		
+		BTState.PATROL:
+			if can_see_target:
+				_transition_to(BTState.ENGAGE_ADVANCE)
+		
+		BTState.INVESTIGATE:
+			if can_see_target:
+				_transition_to(BTState.ENGAGE_ADVANCE)
+			elif _arrived_at(last_known_position, 3.0):
+				_transition_to(BTState.PATROL)
+		
+		BTState.ENGAGE_ADVANCE:
+			if not can_see_target and time_since_seen > 10.0:
+				_transition_to(BTState.INVESTIGATE)
+			elif distance_to_target <= stop_distance:
+				_transition_to(BTState.ENGAGE_HOLD)
+			elif health < 30 and _has_nearby_cover():
+				_transition_to(BTState.TAKE_COVER)
+		
+		BTState.ENGAGE_HOLD:
+			if not can_see_target and time_since_seen > 8.0:
+				_transition_to(BTState.INVESTIGATE)
+			elif health < 30 and _has_nearby_cover():
+				_transition_to(BTState.TAKE_COVER)
+			elif state_timer >= hold_duration:
+				if distance_to_target > stop_distance:
+					_transition_to(BTState.ENGAGE_ADVANCE)
+				else:
+					_transition_to(BTState.ENGAGE_FLANK)
+		
+		BTState.ENGAGE_FLANK:
+			if _arrived_at(flank_target, 2.5):
+				_transition_to(BTState.ENGAGE_HOLD)
+			elif not can_see_target and time_since_seen > 10.0:
+				_transition_to(BTState.INVESTIGATE)
+		
+		BTState.TAKE_COVER:
+			if cover_position == Vector3.ZERO:
+				_transition_to(BTState.ENGAGE_HOLD)
+			elif is_behind_cover and cover_timer >= cover_duration:
+				cover_timer = 0.0
+				is_behind_cover = false
+				cover_position = Vector3.ZERO
+				_transition_to(BTState.ENGAGE_ADVANCE)
+
+func _transition_to(new_state: BTState):
+	bt_state = new_state
+	state_timer = 0.0
+	
+	match new_state:
+		BTState.ENGAGE_HOLD:
+			hold_duration = randf_range(8.0, 14.0)
+		BTState.ENGAGE_FLANK:
+			_pick_flank_target()
+		BTState.TAKE_COVER:
+			var pos = _find_best_cover()
+			if pos != Vector3.ZERO:
+				cover_position = pos
+				cover_timer = 0.0
+				is_behind_cover = false
+			else:
+				bt_state = BTState.ENGAGE_HOLD
+				hold_duration = randf_range(8.0, 14.0)
+
+# =========================================================
+# ÉTAPE 3: AGIR — exécuter l'action choisie
+# =========================================================
+
+func _act(delta):
+	match bt_state:
+		BTState.PATROL:
+			_act_patrol(delta)
+		BTState.INVESTIGATE:
+			_act_investigate(delta)
+		BTState.ENGAGE_ADVANCE:
+			_act_advance(delta)
+		BTState.ENGAGE_HOLD:
+			_act_hold(delta)
+		BTState.ENGAGE_FLANK:
+			_act_flank(delta)
+		BTState.TAKE_COVER:
+			_act_cover(delta)
+
+# --- PATROL ---
+func _act_patrol(delta):
+	if patrol_points.is_empty():
+		_smooth_stop(delta)
+		_play_anim("idle", anim_idle)
+		return
+	
+	var target = patrol_points[current_patrol_index]
+	target.y = global_position.y
+	
+	if _arrived_at(target, 2.0):
+		_smooth_stop(delta)
+		_play_anim("idle", anim_idle)
+		patrol_wait_timer += delta
+		if patrol_wait_timer >= patrol_wait_time:
+			patrol_wait_timer = 0.0
+			current_patrol_index = (current_patrol_index + 1) % patrol_points.size()
+	else:
+		_move_toward(target, speed, delta)
+		_face_direction_of_movement()
+		_play_anim("walk", anim_walk)
+		_sync_anim_speed(speed)
+
+# --- INVESTIGATE ---
+func _act_investigate(delta):
+	if last_known_position == Vector3.ZERO:
+		_smooth_stop(delta)
+		_play_anim("idle", anim_idle)
+		return
+	
+	_move_toward(last_known_position, run_speed, delta)
+	_face_movement_direction()
+	_play_anim("run", anim_run)
+	_sync_anim_speed(run_speed)
+
+# --- ADVANCE ---
+func _act_advance(delta):
+	_face_player()
+	
+	if can_see_target and can_shoot and not is_reloading:
+		_try_shoot()
+	
+	var target_pos = player.global_position if can_see_target else last_known_position
+	_move_toward(target_pos, run_speed, delta)
+	_play_anim("run", anim_run)
+	_sync_anim_speed(run_speed)
+
+# --- HOLD ---
+func _act_hold(delta):
+	_face_player()
+	_smooth_stop(delta)
+	
+	if can_see_target and can_shoot and not is_reloading:
+		_try_shoot()
+		_play_anim("shoot", anim_shoot)
+	else:
+		_play_anim("idle", anim_idle)
+	
+	if anim_player:
+		anim_player.speed_scale = 1.0
+
+# --- FLANK ---
+func _act_flank(delta):
+	_face_player()
+	
+	if can_see_target and can_shoot and not is_reloading:
+		_try_shoot()
+	
+	if flank_target != Vector3.ZERO:
+		_move_toward(flank_target, run_speed, delta)
+		_play_anim("run", anim_run)
+		_sync_anim_speed(run_speed)
+	else:
+		_smooth_stop(delta)
+
+# --- COVER ---
+func _act_cover(delta):
+	if not is_behind_cover:
+		# Se déplacer vers la couverture
+		if cover_position != Vector3.ZERO:
+			_move_toward(cover_position, run_speed, delta)
+			_face_player()
+			_play_anim("run", anim_run)
+			_sync_anim_speed(run_speed)
+			if _arrived_at(cover_position, 2.0):
+				is_behind_cover = true
+				cover_timer = 0.0
+	else:
+		# Derrière la couverture — tirer si possible
+		_smooth_stop(delta)
+		_face_player()
+		cover_timer += delta
+		
+		if anim_crouch != "":
+			_play_anim("crouch", anim_crouch)
+		else:
+			_play_anim("idle", anim_idle)
+		
+		if can_see_target and can_shoot and not is_reloading:
+			_try_shoot()
+
+# =========================================================
+# MOUVEMENT — toujours lissé, jamais de snap
+# =========================================================
+
+func _move_toward(target: Vector3, spd: float, delta: float):
+	var direction = (target - global_position)
+	direction.y = 0
+	if direction.length() < 0.3:
+		_smooth_stop(delta)
+		return
+	direction = direction.normalized()
+	var target_vx = direction.x * spd
+	var target_vz = direction.z * spd
+	var t = clamp(velocity_smoothing * delta, 0.0, 1.0)
+	velocity.x = lerp(velocity.x, target_vx, t)
+	velocity.z = lerp(velocity.z, target_vz, t)
+
+func _smooth_stop(delta):
+	var t = clamp(velocity_smoothing * delta, 0.0, 1.0)
+	velocity.x = lerp(velocity.x, 0.0, t)
+	velocity.z = lerp(velocity.z, 0.0, t)
+
+func _arrived_at(pos: Vector3, threshold: float) -> bool:
+	return Vector2(global_position.x, global_position.z).distance_to(Vector2(pos.x, pos.z)) < threshold
+
+# =========================================================
+# ROTATION — toujours lisse
+# =========================================================
+
+func _apply_smooth_rotation(delta):
+	var current_y = rotation.y
+	var diff = wrapf(target_rotation_y - current_y, -PI, PI)
+	rotation.y += diff * rotation_speed * delta
+
+func _face_player():
+	if not player or not is_instance_valid(player):
+		return
+	var dir = (player.global_position - global_position)
+	dir.y = 0
+	if dir.length_squared() > 0.001:
+		target_rotation_y = atan2(dir.x, dir.z)
+
+func _face_direction_of_movement():
+	var horizontal = Vector3(velocity.x, 0, velocity.z)
+	if horizontal.length_squared() > 0.1:
+		target_rotation_y = atan2(horizontal.x, horizontal.z)
+
+func _face_movement_direction():
+	_face_direction_of_movement()
+
+# =========================================================
+# PERCEPTION — ligne de vue
+# =========================================================
+
+func _check_line_of_sight() -> bool:
+	if not player or not is_instance_valid(player) or not player.is_inside_tree():
+		return false
+	
+	var dist = global_position.distance_to(player.global_position)
+	if dist > detection_range:
+		return false
+	
+	# Très proche = toujours visible
+	if dist < 8.0:
+		return true
+	
+	var space_state = get_world_3d().direct_space_state
+	var ray_start = global_position + Vector3(0, 1.5, 0)
+	var ray_end = player.global_position + Vector3(0, 1.5, 0)
+	var query = PhysicsRayQueryParameters3D.create(ray_start, ray_end)
+	query.exclude = [self]
+	var result = space_state.intersect_ray(query)
+	
+	return result and result.collider == player
+
+# =========================================================
+# TIR
+# =========================================================
+
+func _try_shoot():
+	if not can_shoot or ammo <= 0 or is_dead or is_reloading:
+		return
+	if not player or not is_instance_valid(player) or not player.is_inside_tree():
+		return
+	
+	can_shoot = false
+	fire_cooldown = fire_rate
+	ammo -= 1
+	
+	if gun_sound and gun_sound.stream:
+		gun_sound.pitch_scale = randf_range(0.95, 1.05)
+		if gun_sound.playing:
+			gun_sound.stop()
+		gun_sound.play()
+	
+	_play_anim_shoot()
+	_fire_bullet()
+	
+	if ammo <= 0:
+		is_reloading = true
+		reload_timer = 2.5
+		if anim_player and anim_reload != "":
+			anim_player.play(anim_reload)
+
+func get_gun_tip_position() -> Vector3:
+	return global_position + global_transform.basis * gun_tip_offset
+
+func _fire_bullet():
+	if bullet_scene == null or not is_inside_tree() or not get_tree():
+		return
+	if not player or not is_instance_valid(player):
+		return
+	
+	var spawn_pos = get_gun_tip_position()
+	var target_pos = player.global_position + Vector3(0, 1.2, 0)
+	
+	var spread := 0.03
+	target_pos += Vector3(
+		randf_range(-spread, spread),
+		randf_range(-spread, spread),
+		randf_range(-spread, spread)
+	) * global_position.distance_to(target_pos)
+	
+	var direction = (target_pos - spawn_pos).normalized()
+	
+	var bullet = bullet_scene.instantiate()
+	bullet.direction = direction
+	call_deferred("_add_bullet", bullet, spawn_pos, direction)
+	
+	# Hitscan pour dégâts immédiats
+	var space_state = get_world_3d().direct_space_state
+	var ray_end = spawn_pos + direction * 500.0
+	var query = PhysicsRayQueryParameters3D.create(spawn_pos, ray_end)
+	query.exclude = [self]
+	var result = space_state.intersect_ray(query)
+	
+	if result:
+		var collider = result.collider
+		if collider != null and collider.has_method("take_damage"):
+			collider.take_damage(damage)
+		_create_impact(result.position, result.normal)
+
+func _add_bullet(bullet, spawn_pos: Vector3, direction: Vector3):
+	if is_inside_tree() and get_tree():
+		get_tree().current_scene.add_child(bullet)
+		bullet.global_position = spawn_pos
+		bullet.look_at(spawn_pos + direction, Vector3.UP)
+
+func _create_impact(pos, normal_vec):
+	if impact_scene == null or not get_tree():
+		return
+	var impact = impact_scene.instantiate()
+	if impact:
+		get_tree().current_scene.add_child(impact)
+		impact.global_position = pos + normal_vec * 0.02
+		if normal_vec != Vector3.ZERO:
+			impact.look_at(pos + normal_vec, Vector3.UP)
+	if bullet_impact_scene:
+		var particles = bullet_impact_scene.instantiate()
+		if particles:
+			get_tree().current_scene.add_child(particles)
+			particles.global_position = pos
+			particles.look_at(pos + normal_vec, Vector3.UP)
+			particles.emitting = true
+			particles.one_shot = true
+
+# =========================================================
+# FLANK — position latérale
+# =========================================================
+
+func _pick_flank_target():
+	if not player:
+		return
+	var to_player = (player.global_position - global_position).normalized()
+	var flank_dir = Vector3(-to_player.z, 0, to_player.x)
+	if randf() < 0.5:
+		flank_dir = -flank_dir
+	flank_target = global_position + flank_dir * randf_range(5, 10) + to_player * randf_range(2, 5)
+	flank_target.y = global_position.y
+
+# =========================================================
+# COUVERTURE — scan obstacles
+# =========================================================
+
+func _has_nearby_cover() -> bool:
+	cover_check_timer = 0.0
+	_scan_nearby_obstacles()
+	return not nearby_obstacles.is_empty()
+
+func _scan_nearby_obstacles():
+	nearby_obstacles.clear()
+	if not player:
+		return
+	var space_state = get_world_3d().direct_space_state
+	var directions = [
+		Vector3(1, 0, 0), Vector3(-1, 0, 0),
+		Vector3(0, 0, 1), Vector3(0, 0, -1),
+		Vector3(1, 0, 1).normalized(), Vector3(-1, 0, 1).normalized(),
+		Vector3(1, 0, -1).normalized(), Vector3(-1, 0, -1).normalized()
+	]
+	for dir in directions:
+		var ray_start = global_position + Vector3(0, 1.0, 0)
+		var ray_end = ray_start + dir * 12.0
+		var query = PhysicsRayQueryParameters3D.create(ray_start, ray_end)
+		query.exclude = [self]
+		query.collision_mask = 1
+		var result = space_state.intersect_ray(query)
+		if result and result.collider is StaticBody3D:
+			nearby_obstacles.append({
+				"position": result.position,
+				"normal": result.normal,
+				"distance": global_position.distance_to(result.position)
+			})
+
+func _find_best_cover() -> Vector3:
+	if nearby_obstacles.is_empty() or not player:
+		return Vector3.ZERO
+	var best_pos := Vector3.ZERO
+	var best_score := -999.0
+	for obs in nearby_obstacles:
+		var obs_pos: Vector3 = obs["position"]
+		var obs_normal: Vector3 = obs["normal"]
+		var behind_cover = obs_pos + obs_normal * 1.5
+		behind_cover.y = global_position.y
+		var to_player_dir = (player.global_position - behind_cover).normalized()
+		var cover_dot = obs_normal.dot(to_player_dir)
+		var dist_from_me = global_position.distance_to(behind_cover)
+		var dist_from_player = player.global_position.distance_to(behind_cover)
+		var score = cover_dot * 10.0 - dist_from_me * 0.5
+		if dist_from_player > 5.0 and dist_from_player < 30.0:
+			score += 5.0
+		if score > best_score:
+			best_score = score
+			best_pos = behind_cover
+	return best_pos
+
+# =========================================================
+# ANIMATIONS
+# =========================================================
+
+func _play_anim(tag: String, a_name: String):
+	if not anim_player:
+		return
+	if a_name == "":
+		if all_anims.size() > 0:
+			a_name = all_anims[0]
+		else:
+			return
+	if not anim_player.has_animation(a_name):
+		return
+	if current_anim == tag and anim_player.is_playing():
+		return
+	anim_player.play(a_name)
+	anim_player.speed_scale = 1.0
+	current_anim = tag
+
+func _play_anim_shoot():
+	if not anim_player:
+		return
+	var moving = velocity.length() > 0.5
+	if moving and anim_shoot_walk != "":
+		_play_anim("shoot_walk", anim_shoot_walk)
+	elif anim_shoot != "":
+		_play_anim("shoot", anim_shoot)
+
+func _sync_anim_speed(target_speed: float):
+	if anim_player and target_speed > 0:
+		anim_player.speed_scale = clamp(velocity.length() / target_speed, 0.4, 1.5)
+
+func play_idle():
+	_play_anim("idle", anim_idle)
+
+func play_walk():
+	if anim_walk != "":
+		_play_anim("walk", anim_walk)
+	elif anim_run != "":
+		_play_anim("walk", anim_run)
+
+func play_run():
+	if anim_run != "":
+		_play_anim("run", anim_run)
+	elif anim_walk != "":
+		_play_anim("run", anim_walk)
+
+func play_shoot():
+	_play_anim("shoot", anim_shoot)
+
+# =========================================================
+# DÉGÂTS ET MORT
+# =========================================================
+
+func take_damage(amount):
+	if is_dead:
+		return
+	health -= amount
+	if hit_effect_scene and is_inside_tree():
+		var hit_effect = hit_effect_scene.instantiate()
+		add_child(hit_effect)
+		hit_effect.global_position = global_position + Vector3(0, 1.5, 0)
+		hit_effect.emitting = true
+		hit_effect.one_shot = true
+	if health <= 0:
+		die()
+
+func die():
+	if is_dead:
+		return
+	is_dead = true
+	bt_state = BTState.DEAD
+	velocity = Vector3.ZERO
+	if anim_player and anim_die != "":
+		anim_player.play(anim_die)
+	if hit_effect_scene and is_inside_tree():
+		var hit_effect = hit_effect_scene.instantiate()
+		hit_effect.global_position = global_position + Vector3(0, 1.5, 0)
+		get_tree().current_scene.add_child(hit_effect)
+		hit_effect.emitting = true
+	# L'ENNEMI RESTE AU SOL — PAS DE RESPAWN, PAS DE TÉLÉPORTATION
+
+# =========================================================
+# GETTERS
+# =========================================================
+
+func get_health():
+	return health
+
+func get_ammo():
+	return ammo
+
+# =========================================================
+# UTILITAIRES
+# =========================================================
+
+func find_player():
+	var players = get_tree().get_nodes_in_group("player")
+	if players.size() > 0:
+		player = players[0]
+
+func _snap_to_ground():
+	var space_state = get_world_3d().direct_space_state
+	var ray_start = global_position + Vector3(0, 5.0, 0)
+	var ray_end = global_position + Vector3(0, -50.0, 0)
+	var query = PhysicsRayQueryParameters3D.create(ray_start, ray_end)
+	query.exclude = [self]
+	query.collision_mask = 1
+	var result = space_state.intersect_ray(query)
+	if result:
+		global_position.y = result.position.y
+
+func _generate_patrol_points():
+	patrol_points.clear()
+	for i in range(4):
+		var angle = (PI * 2.0 / 4.0) * i
+		var offset = Vector3(cos(angle) * patrol_radius, 0, sin(angle) * patrol_radius)
+		var point = initial_position + offset
+		point.y = initial_position.y
+		patrol_points.append(point)
 
 func _init_animation_player():
 	if has_node("AnimationPlayer"):
@@ -201,541 +855,15 @@ func _get_animation_resource(a_name: String) -> Animation:
 		return anim_player.get_animation(a_name)
 	return null
 
-func _snap_to_ground():
-	var space_state = get_world_3d().direct_space_state
-	var ray_start = global_position + Vector3(0, 5.0, 0)
-	var ray_end = global_position + Vector3(0, -50.0, 0)
-	var query = PhysicsRayQueryParameters3D.create(ray_start, ray_end)
-	query.exclude = [self]
-	query.collision_mask = 1
-	var result = space_state.intersect_ray(query)
-	if result:
-		global_position.y = result.position.y
-
-func _generate_patrol_points():
-	patrol_points.clear()
-	for i in range(4):
-		var angle = (PI * 2.0 / 4.0) * i
-		var offset = Vector3(cos(angle) * patrol_radius, 0, sin(angle) * patrol_radius)
-		var point = initial_position + offset
-		point.y = initial_position.y
-		patrol_points.append(point)
-
-# =========================================================
-# PHYSICS PROCESS
-# =========================================================
-
-func _physics_process(delta):
-	# Timers (pas d'await = pas de bug élastique)
-	if fire_cooldown > 0:
-		fire_cooldown -= delta
-		if fire_cooldown <= 0:
-			can_shoot = true
-	
-	if is_reloading:
-		reload_timer -= delta
-		if reload_timer <= 0:
-			is_reloading = false
-			ammo = max_ammo
-	
-	if is_dead:
-		death_timer -= delta
-		if death_timer <= 0:
-			respawn()
-		return
-	
-	if not is_on_floor():
-		velocity.y -= gravity * delta
-	else:
-		velocity.y = 0
-	
-	if not player:
-		find_player()
-	
-	var distance_to_player := 999.0
-	if player and is_instance_valid(player):
-		distance_to_player = global_position.distance_to(player.global_position)
-	
-	var sees_player = can_see_player()
-	if sees_player:
-		last_seen_position = player.global_position
-		time_since_last_seen = 0.0
-		if not has_seen_player:
-			has_seen_player = true
-			current_state = CombatState.ADVANCE
-	else:
-		time_since_last_seen += delta
-	
-	cover_check_timer += delta
-	if cover_check_timer >= cover_check_interval:
-		cover_check_timer = 0.0
-		_scan_nearby_obstacles()
-	
-	match current_state:
-		CombatState.IDLE_PATROL:
-			_handle_idle_patrol(delta)
-		CombatState.ADVANCE:
-			_handle_advance(delta, distance_to_player)
-		CombatState.HOLD_POSITION:
-			_handle_hold_position(delta, distance_to_player)
-		CombatState.COVER:
-			_handle_cover(delta)
-		CombatState.FLANK:
-			_handle_flank(delta, distance_to_player)
-	
-	_apply_smooth_rotation(delta)
-	move_and_slide()
-
-func _apply_smooth_rotation(delta):
-	var current_y = rotation.y
-	var diff = wrapf(target_rotation_y - current_y, -PI, PI)
-	rotation.y += diff * rotation_speed * delta
-
-# =========================================================
-# TROUVER LE JOUEUR
-# =========================================================
-
-func find_player():
-	var players = get_tree().get_nodes_in_group("player")
-	if players.size() > 0:
-		player = players[0]
-
-# =========================================================
-# VOIR LE JOUEUR
-# =========================================================
-
-func can_see_player() -> bool:
-	if not player or not is_instance_valid(player) or not player.is_inside_tree():
-		return false
-	
-	var distance = global_position.distance_to(player.global_position)
-	if distance > detection_range:
-		return false
-	
-	var space_state = get_world_3d().direct_space_state
-	var ray_start = global_position + Vector3(0, 1.5, 0)
-	var ray_end = player.global_position + Vector3(0, 1.5, 0)
-	
-	var query = PhysicsRayQueryParameters3D.create(ray_start, ray_end)
-	query.exclude = [self]
-	var result = space_state.intersect_ray(query)
-	
-	if result and result.collider == player:
-		return true
-	if distance < 8.0:
-		return true
-	return false
-
-# =========================================================
-# SCAN OBSTACLES
-# =========================================================
-
-func _scan_nearby_obstacles():
-	nearby_obstacles.clear()
-	if not player:
-		return
-	var space_state = get_world_3d().direct_space_state
-	var directions = [
-		Vector3(1, 0, 0), Vector3(-1, 0, 0),
-		Vector3(0, 0, 1), Vector3(0, 0, -1),
-		Vector3(1, 0, 1).normalized(), Vector3(-1, 0, 1).normalized(),
-		Vector3(1, 0, -1).normalized(), Vector3(-1, 0, -1).normalized()
-	]
-	for dir in directions:
-		var ray_start = global_position + Vector3(0, 1.0, 0)
-		var ray_end = ray_start + dir * 12.0
-		var query = PhysicsRayQueryParameters3D.create(ray_start, ray_end)
-		query.exclude = [self]
-		query.collision_mask = 1
-		var result = space_state.intersect_ray(query)
-		if result and result.collider is StaticBody3D:
-			nearby_obstacles.append({
-				"position": result.position,
-				"normal": result.normal,
-				"collider": result.collider,
-				"distance": global_position.distance_to(result.position)
-			})
-
-func _find_best_cover() -> Vector3:
-	if nearby_obstacles.is_empty() or not player:
-		return Vector3.ZERO
-	var best_pos := Vector3.ZERO
-	var best_score := -999.0
-	for obs in nearby_obstacles:
-		var obs_pos: Vector3 = obs["position"]
-		var obs_normal: Vector3 = obs["normal"]
-		var behind_cover = obs_pos + obs_normal * 1.5
-		behind_cover.y = global_position.y
-		var to_player = (player.global_position - behind_cover).normalized()
-		var cover_dot = obs_normal.dot(to_player)
-		var dist_from_me = global_position.distance_to(behind_cover)
-		var dist_from_player = player.global_position.distance_to(behind_cover)
-		var score = cover_dot * 10.0 - dist_from_me * 0.5
-		if dist_from_player > 5.0 and dist_from_player < 30.0:
-			score += 5.0
-		if score > best_score:
-			best_score = score
-			best_pos = behind_cover
-	return best_pos
-
-# =========================================================
-# ÉTAT 1: PATROUILLE — avant d'avoir vu le joueur
-# =========================================================
-
-func _handle_idle_patrol(delta):
-	if has_seen_player:
-		current_state = CombatState.ADVANCE
-		velocity.x = 0
-		velocity.z = 0
-		return
-	
-	if patrol_points.is_empty():
-		_play_anim_continuous(anim_idle, "idle")
-		velocity.x = lerp(velocity.x, 0.0, clamp(velocity_smoothing * delta, 0.0, 1.0))
-		velocity.z = lerp(velocity.z, 0.0, clamp(velocity_smoothing * delta, 0.0, 1.0))
-		return
-	
-	var target = patrol_points[current_patrol_index]
-	target.y = global_position.y
-	var dist = Vector2(global_position.x, global_position.z).distance_to(Vector2(target.x, target.z))
-	
-	if dist < 2.0:
-		patrol_wait_timer += delta
-		velocity.x = lerp(velocity.x, 0.0, clamp(velocity_smoothing * delta, 0.0, 1.0))
-		velocity.z = lerp(velocity.z, 0.0, clamp(velocity_smoothing * delta, 0.0, 1.0))
-		_play_anim_continuous(anim_idle, "idle")
-		if anim_player:
-			anim_player.speed_scale = 1.0
-		if patrol_wait_timer >= patrol_wait_time:
-			patrol_wait_timer = 0.0
-			current_patrol_index = (current_patrol_index + 1) % patrol_points.size()
-	else:
-		var direction = (target - global_position)
-		direction.y = 0
-		direction = direction.normalized()
-		var target_vx = direction.x * speed
-		var target_vz = direction.z * speed
-		velocity.x = lerp(velocity.x, target_vx, clamp(velocity_smoothing * delta, 0.0, 1.0))
-		velocity.z = lerp(velocity.z, target_vz, clamp(velocity_smoothing * delta, 0.0, 1.0))
-		_face_direction(direction)
-		_play_anim_continuous(anim_walk, "walk")
-		if anim_player:
-			anim_player.speed_scale = clamp(velocity.length() / speed, 0.5, 1.5)
-
-# =========================================================
-# ÉTAT 2: AVANCER — directement vers le joueur
-# =========================================================
-
-func _handle_advance(delta, distance_to_player):
-	if not player:
-		return
-	
-	_face_player()
-	
-	if can_see_player() and can_shoot:
-		shoot_at_player()
-	
-	# Arrivé à portée de tir → s'arrêter et tenir la position
-	if distance_to_player <= stop_distance:
-		current_state = CombatState.HOLD_POSITION
-		hold_timer = 0.0
-		hold_duration = randf_range(10.0, 15.0)
-		return
-	
-	# Perdu de vue depuis longtemps → continuer vers la dernière position connue
-	# Ne PAS arrêter d'avancer — aller à last_seen_position puis tenir
-	if time_since_last_seen > 15.0 and not can_see_player():
-		var dist_to_last = global_position.distance_to(last_seen_position)
-		if dist_to_last < 5.0:
-			current_state = CombatState.HOLD_POSITION
-			hold_timer = 0.0
-			hold_duration = randf_range(5.0, 8.0)
-			return
-	
-	# Avancer DIRECTEMENT vers le joueur (pas de point intermédiaire)
-	var target_pos = player.global_position if can_see_player() else last_seen_position
-	var direction = (target_pos - global_position)
-	direction.y = 0
-	if direction.length() > 0.5:
-		direction = direction.normalized()
-		var target_vx = direction.x * run_speed
-		var target_vz = direction.z * run_speed
-		velocity.x = lerp(velocity.x, target_vx, clamp(velocity_smoothing * delta, 0.0, 1.0))
-		velocity.z = lerp(velocity.z, target_vz, clamp(velocity_smoothing * delta, 0.0, 1.0))
-		_play_anim_continuous(anim_run, "run")
-		if anim_player:
-			anim_player.speed_scale = clamp(velocity.length() / run_speed, 0.5, 1.5)
-	else:
-		velocity.x = lerp(velocity.x, 0.0, clamp(velocity_smoothing * delta, 0.0, 1.0))
-		velocity.z = lerp(velocity.z, 0.0, clamp(velocity_smoothing * delta, 0.0, 1.0))
-		_play_anim_continuous(anim_idle, "idle")
-		if anim_player:
-			anim_player.speed_scale = 1.0
-
-# =========================================================
-# ÉTAT 3: TENIR POSITION — rester et tirer 10-15s
-# =========================================================
-
-func _handle_hold_position(delta, distance_to_player):
-	if not player:
-		return
-	
-	_face_player()
-	velocity.x = lerp(velocity.x, 0.0, clamp(velocity_smoothing * delta, 0.0, 1.0))
-	velocity.z = lerp(velocity.z, 0.0, clamp(velocity_smoothing * delta, 0.0, 1.0))
-	
-	if can_see_player() and can_shoot:
-		shoot_at_player()
-		_play_anim_continuous(anim_shoot, "shoot")
-	else:
-		_play_anim_continuous(anim_idle, "idle")
-	if anim_player:
-		anim_player.speed_scale = 1.0
-	
-	hold_timer += delta
-	
-	if health < 40 and not nearby_obstacles.is_empty():
-		var cover_pos = _find_best_cover()
-		if cover_pos != Vector3.ZERO:
-			cover_position = cover_pos
-			current_state = CombatState.COVER
-			return
-	
-	if hold_timer >= hold_duration:
-		if distance_to_player > stop_distance:
-			# Trop loin → avancer encore
-			current_state = CombatState.ADVANCE
-		else:
-			# À portée → flanquer pour changer de position
-			current_state = CombatState.FLANK
-			_pick_flank_target()
-
-# =========================================================
-# ÉTAT 4: COUVERTURE — se cacher derrière un obstacle
-# =========================================================
-
-func _handle_cover(delta):
-	if cover_position == Vector3.ZERO:
-		current_state = CombatState.HOLD_POSITION
-		hold_timer = 0.0
-		hold_duration = randf_range(10.0, 15.0)
-		return
-	
-	var dist_to_cover = global_position.distance_to(cover_position)
-	
-	if dist_to_cover > 2.0:
-		var direction = (cover_position - global_position)
-		direction.y = 0
-		direction = direction.normalized()
-		var target_vx = direction.x * run_speed
-		var target_vz = direction.z * run_speed
-		velocity.x = lerp(velocity.x, target_vx, clamp(velocity_smoothing * delta, 0.0, 1.0))
-		velocity.z = lerp(velocity.z, target_vz, clamp(velocity_smoothing * delta, 0.0, 1.0))
-		_face_player()
-		_play_anim_continuous(anim_run, "run")
-		if anim_player:
-			anim_player.speed_scale = clamp(velocity.length() / run_speed, 0.5, 1.5)
-	else:
-		velocity.x = lerp(velocity.x, 0.0, clamp(velocity_smoothing * delta, 0.0, 1.0))
-		velocity.z = lerp(velocity.z, 0.0, clamp(velocity_smoothing * delta, 0.0, 1.0))
-		is_behind_cover = true
-		_face_player()
-		
-		if anim_crouch != "":
-			_play_anim_continuous(anim_crouch, "crouch")
-		else:
-			_play_anim_continuous(anim_idle, "idle")
-		
-		if can_see_player() and can_shoot:
-			shoot_at_player()
-		
-		cover_timer += delta
-		if cover_timer >= cover_wait_time:
-			cover_timer = 0.0
-			is_behind_cover = false
-			cover_position = Vector3.ZERO
-			current_state = CombatState.ADVANCE
-
-# =========================================================
-# ÉTAT 5: FLANQUER — changer de position latérale
-# =========================================================
-
-func _pick_flank_target():
-	if not player:
-		return
-	var to_player = (player.global_position - global_position).normalized()
-	# Direction latérale (perpendiculaire au joueur)
-	var flank_dir = Vector3(-to_player.z, 0, to_player.x)
-	if randf() < 0.5:
-		flank_dir = -flank_dir
-	# Toujours avancer un peu vers le joueur, jamais reculer
-	flank_target = global_position + flank_dir * randf_range(5, 10) + to_player * randf_range(2, 5)
-	flank_target.y = global_position.y
-
-func _handle_flank(delta, _distance_to_player):
-	var _delta = delta
-	if not player:
-		return
-	
-	_face_player()
-	
-	if can_see_player() and can_shoot:
-		shoot_at_player()
-	
-	if flank_target == Vector3.ZERO:
-		_pick_flank_target()
-	
-	var dist_to_target = Vector2(global_position.x, global_position.z).distance_to(Vector2(flank_target.x, flank_target.z))
-	
-	if dist_to_target < 2.5:
-		flank_target = Vector3.ZERO
-		current_state = CombatState.HOLD_POSITION
-		hold_timer = 0.0
-		hold_duration = randf_range(10.0, 15.0)
-		return
-	
-	var direction = (flank_target - global_position)
-	direction.y = 0
-	if direction.length() > 0.5:
-		direction = direction.normalized()
-		var target_vx = direction.x * run_speed
-		var target_vz = direction.z * run_speed
-		velocity.x = lerp(velocity.x, target_vx, clamp(velocity_smoothing * _delta, 0.0, 1.0))
-		velocity.z = lerp(velocity.z, target_vz, clamp(velocity_smoothing * _delta, 0.0, 1.0))
-		_play_anim_continuous(anim_run, "run")
-		if anim_player:
-			anim_player.speed_scale = clamp(velocity.length() / run_speed, 0.5, 1.5)
-	else:
-		velocity.x = lerp(velocity.x, 0.0, clamp(velocity_smoothing * _delta, 0.0, 1.0))
-		velocity.z = lerp(velocity.z, 0.0, clamp(velocity_smoothing * _delta, 0.0, 1.0))
-
-# =========================================================
-# ROTATION
-# =========================================================
-
-func _face_direction(direction: Vector3):
-	if direction.length_squared() < 0.001:
-		return
-	target_rotation_y = atan2(direction.x, direction.z)
-
-func _face_player():
-	if not player:
-		return
-	var direction = (player.global_position - global_position)
-	direction.y = 0
-	if direction.length_squared() > 0.001:
-		target_rotation_y = atan2(direction.x, direction.z)
-
-func find_cover_position():
-	var cover_pos = _find_best_cover()
-	if cover_pos != Vector3.ZERO:
-		cover_position = cover_pos
-
-func look_at_player():
-	_face_player()
-
-# =========================================================
-# TIRER SUR LE JOUEUR
-# =========================================================
-
+# Compatibilité avec les anciens appels
 func shoot_at_player():
-	if not can_shoot or ammo <= 0 or is_dead or is_reloading:
-		return
-	if not player or not is_instance_valid(player) or not player.is_inside_tree():
-		return
-	
-	can_shoot = false
-	fire_cooldown = fire_rate
-	ammo -= 1
-	
-	if gun_sound and gun_sound.stream:
-		gun_sound.pitch_scale = randf_range(0.95, 1.05)
-		if gun_sound.playing:
-			gun_sound.stop()
-		gun_sound.play()
-	
-	_play_anim_shoot()
-	shoot()
-	
-	if ammo <= 0:
-		is_reloading = true
-		reload_timer = 2.5
-
-func get_gun_tip_position() -> Vector3:
-	return global_position + global_transform.basis * gun_tip_offset
-
-# =========================================================
-# TIR
-# =========================================================
+	_try_shoot()
 
 func shoot():
-	if bullet_scene == null:
-		return
-	if not is_inside_tree() or not get_tree():
-		return
-	if not player or not is_instance_valid(player):
-		return
-	
-	var spawn_pos = get_gun_tip_position()
-	var target_pos = player.global_position + Vector3(0, 1.2, 0)
-	
-	var spread := 0.03
-	target_pos += Vector3(
-		randf_range(-spread, spread),
-		randf_range(-spread, spread),
-		randf_range(-spread, spread)
-	) * global_position.distance_to(target_pos)
-	
-	var direction = (target_pos - spawn_pos).normalized()
-	
-	var bullet = bullet_scene.instantiate()
-	bullet.direction = direction
-	
-	call_deferred("_add_bullet", bullet, spawn_pos, direction)
-	
-	var space_state = get_world_3d().direct_space_state
-	var ray_end = spawn_pos + direction * 500.0
-	var query = PhysicsRayQueryParameters3D.create(spawn_pos, ray_end)
-	query.exclude = [self]
-	var result = space_state.intersect_ray(query)
-	
-	if result:
-		var collider = result.collider
-		if collider != null and collider.has_method("take_damage"):
-			collider.take_damage(damage)
-		create_impact(result.position, result.normal)
-
-func _add_bullet(bullet, spawn_pos: Vector3, direction: Vector3):
-	if is_inside_tree() and get_tree():
-		get_tree().current_scene.add_child(bullet)
-		bullet.global_position = spawn_pos
-		bullet.look_at(spawn_pos + direction, Vector3.UP)
-
-# =========================================================
-# IMPACT
-# =========================================================
+	_fire_bullet()
 
 func create_impact(pos, normal_vec):
-	if impact_scene == null or not get_tree():
-		return
-	var impact = impact_scene.instantiate()
-	if impact:
-		get_tree().current_scene.add_child(impact)
-		impact.global_position = pos + normal_vec * 0.02
-		if normal_vec != Vector3.ZERO:
-			impact.look_at(pos + normal_vec, Vector3.UP)
-	if bullet_impact_scene:
-		var particles = bullet_impact_scene.instantiate()
-		if particles:
-			get_tree().current_scene.add_child(particles)
-			particles.global_position = pos
-			particles.look_at(pos + normal_vec, Vector3.UP)
-			particles.emitting = true
-			particles.one_shot = true
-
-# =========================================================
-# RECHARGER
-# =========================================================
+	_create_impact(pos, normal_vec)
 
 func reload():
 	if is_dead:
@@ -745,111 +873,10 @@ func reload():
 	if anim_player and anim_reload != "":
 		anim_player.play(anim_reload)
 
-# =========================================================
-# ANIMATIONS — boucle continue
-# =========================================================
+func look_at_player():
+	_face_player()
 
-func _play_anim_continuous(a_name: String, tag: String):
-	if not anim_player:
-		return
-	if a_name == "":
-		if all_anims.size() > 0:
-			a_name = all_anims[0]
-		else:
-			return
-	if not anim_player.has_animation(a_name):
-		return
-	if current_anim == tag and anim_player.is_playing():
-		return
-	anim_player.play(a_name)
-	anim_player.speed_scale = 1.0
-	current_anim = tag
-
-func _play_anim_shoot():
-	if not anim_player:
-		return
-	var moving = velocity.length() > 0.5
-	if moving and anim_shoot_walk != "":
-		_play_anim_continuous(anim_shoot_walk, "shoot_walk")
-	elif anim_shoot != "":
-		_play_anim_continuous(anim_shoot, "shoot")
-
-func play_idle():
-	_play_anim_continuous(anim_idle, "idle")
-
-func play_walk():
-	if anim_walk != "":
-		_play_anim_continuous(anim_walk, "walk")
-	elif anim_run != "":
-		_play_anim_continuous(anim_run, "walk")
-
-func play_run():
-	if anim_run != "":
-		_play_anim_continuous(anim_run, "run")
-	elif anim_walk != "":
-		_play_anim_continuous(anim_walk, "run")
-
-func play_shoot():
-	_play_anim_continuous(anim_shoot, "shoot")
-
-# =========================================================
-# GETTERS
-# =========================================================
-
-func get_health():
-	return health
-
-func get_ammo():
-	return ammo
-
-# =========================================================
-# DÉGÂTS
-# =========================================================
-
-func take_damage(amount):
-	if is_dead:
-		return
-	health -= amount
-	if hit_effect_scene and is_inside_tree():
-		var hit_effect = hit_effect_scene.instantiate()
-		add_child(hit_effect)
-		hit_effect.global_position = global_position + Vector3(0, 1.5, 0)
-		hit_effect.emitting = true
-		hit_effect.one_shot = true
-	if health <= 0:
-		die()
-
-func die():
-	if is_dead:
-		return
-	is_dead = true
-	death_timer = 8.0
-	velocity = Vector3.ZERO
-	if anim_player and anim_die != "":
-		anim_player.play(anim_die)
-	if hit_effect_scene and is_inside_tree():
-		var hit_effect = hit_effect_scene.instantiate()
-		hit_effect.global_position = global_position + Vector3(0, 1.5, 0)
-		get_tree().current_scene.add_child(hit_effect)
-		hit_effect.emitting = true
-
-func respawn():
-	is_dead = false
-	health = 100
-	ammo = max_ammo
-	has_seen_player = true
-	current_state = CombatState.ADVANCE
-	hold_timer = 0.0
-	
-	# Respawn à une position aléatoire AUTOUR de la position initiale (pas au même endroit)
-	var angle = randf() * PI * 2.0
-	var dist = randf_range(10.0, 25.0)
-	var offset = Vector3(cos(angle) * dist, 0, sin(angle) * dist)
-	global_position = initial_position + offset
-	_snap_to_ground()
-	velocity = Vector3.ZERO
-	
-	# Regénérer les points de patrouille autour de la nouvelle position
-	initial_position = global_position
-	_generate_patrol_points()
-	_play_anim_continuous(anim_idle, "idle")
+func find_cover_position():
+	var pos = _find_best_cover()
+	if pos != Vector3.ZERO:
+		cover_position = pos
