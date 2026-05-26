@@ -36,10 +36,14 @@ var velocity_smoothing := 10.0
 var player: CharacterBody3D
 var can_shoot := true
 var fire_rate := 0.2
+var fire_cooldown := 0.0
 var ammo := 30
 var max_ammo := 30
 var health := 100
 var is_dead := false
+var reload_timer := 0.0
+var is_reloading := false
+var death_timer := 0.0
 
 var current_anim := ""
 
@@ -91,6 +95,8 @@ var nearby_obstacles: Array = []
 var cover_check_timer := 0.0
 var cover_check_interval := 1.5
 var is_behind_cover := false
+var cover_timer := 0.0
+var cover_wait_time := 4.0
 
 # =========================================================
 # ANIMATION NAMES CACHE
@@ -220,7 +226,22 @@ func _generate_patrol_points():
 # =========================================================
 
 func _physics_process(delta):
+	# Timers (pas d'await = pas de bug élastique)
+	if fire_cooldown > 0:
+		fire_cooldown -= delta
+		if fire_cooldown <= 0:
+			can_shoot = true
+	
+	if is_reloading:
+		reload_timer -= delta
+		if reload_timer <= 0:
+			is_reloading = false
+			ammo = max_ammo
+	
 	if is_dead:
+		death_timer -= delta
+		if death_timer <= 0:
+			respawn()
 		return
 	
 	if not is_on_floor():
@@ -528,12 +549,12 @@ func _handle_cover(delta):
 		if can_see_player() and can_shoot:
 			shoot_at_player()
 		
-		if is_inside_tree() and get_tree():
-			await get_tree().create_timer(4.0).timeout
-		
-		is_behind_cover = false
-		cover_position = Vector3.ZERO
-		current_state = CombatState.ADVANCE
+		cover_timer += delta
+		if cover_timer >= cover_wait_time:
+			cover_timer = 0.0
+			is_behind_cover = false
+			cover_position = Vector3.ZERO
+			current_state = CombatState.ADVANCE
 
 # =========================================================
 # ÉTAT 5: FLANQUER — changer de position latérale
@@ -618,12 +639,13 @@ func look_at_player():
 # =========================================================
 
 func shoot_at_player():
-	if not can_shoot or ammo <= 0 or is_dead:
+	if not can_shoot or ammo <= 0 or is_dead or is_reloading:
 		return
 	if not player or not is_instance_valid(player) or not player.is_inside_tree():
 		return
 	
 	can_shoot = false
+	fire_cooldown = fire_rate
 	ammo -= 1
 	
 	if gun_sound and gun_sound.stream:
@@ -636,13 +658,8 @@ func shoot_at_player():
 	shoot()
 	
 	if ammo <= 0:
-		reload()
-	
-	if is_inside_tree() and get_tree():
-		await get_tree().create_timer(fire_rate).timeout
-		can_shoot = true
-	else:
-		can_shoot = true
+		is_reloading = true
+		reload_timer = 2.5
 
 func get_gun_tip_position() -> Vector3:
 	return global_position + global_transform.basis * gun_tip_offset
@@ -723,11 +740,10 @@ func create_impact(pos, normal_vec):
 func reload():
 	if is_dead:
 		return
+	is_reloading = true
+	reload_timer = 2.5
 	if anim_player and anim_reload != "":
 		anim_player.play(anim_reload)
-	if is_inside_tree() and get_tree():
-		await get_tree().create_timer(2.5).timeout
-	ammo = max_ammo
 
 # =========================================================
 # ANIMATIONS — boucle continue
@@ -807,6 +823,7 @@ func die():
 	if is_dead:
 		return
 	is_dead = true
+	death_timer = 8.0
 	velocity = Vector3.ZERO
 	if anim_player and anim_die != "":
 		anim_player.play(anim_die)
@@ -815,10 +832,6 @@ func die():
 		hit_effect.global_position = global_position + Vector3(0, 1.5, 0)
 		get_tree().current_scene.add_child(hit_effect)
 		hit_effect.emitting = true
-	# Attendre 8 secondes avant de respawn (plus réaliste)
-	if is_inside_tree() and get_tree():
-		await get_tree().create_timer(8.0).timeout
-	respawn()
 
 func respawn():
 	is_dead = false
