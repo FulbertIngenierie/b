@@ -1,0 +1,11 @@
+Model Information:
+* title:	Battlefield 4 - US Assault
+* source:	https://sketchfab.com/3d-models/battlefield-4-us-assault-ef566da6977e4aba908d34181a330b8a
+* author:	thientrung2004pr (https://sketchfab.com/U.SSCIFI)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Battlefield 4 - US Assault" (https://sketchfab.com/3d-models/battlefield-4-us-assault-ef566da6977e4aba908d34181a330b8a) by thientrung2004pr (https://sketchfab.com/U.SSCIFI) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

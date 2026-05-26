@@ -1,0 +1,13 @@
+[gd_resource type="VisualShader" format=3 uid="uid://kl0436xy5kt4"]
+
+[ext_resource type="Texture2D" uid="uid://saoom87jy665" path="res://Tropical_Environment_Pack_v2.0/Tropical_Environment_Pack_v2.0_Ready/Tropical Rain Forest_Source v2.0/game/art/shapes/OceanAssets/ReefBase01/3td_ReefTexture_01_512.jpg" id="1_rdt4m"]
+
+[sub_resource type="VisualShaderNodeTexture" id="VisualShaderNodeTexture_m5p72"]
+texture = ExtResource("1_rdt4m")
+texture_type = 1
+
+[resource]
+nodes/vertex/0/position = Vector2(506.66666, 80)
+nodes/vertex/2/node = SubResource("VisualShaderNodeTexture_m5p72")
+nodes/vertex/2/position = Vector2(80, 106.666664)
+nodes/vertex/connections = PackedInt32Array(2, 0, 0, 0)

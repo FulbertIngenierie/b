@@ -1,0 +1,20 @@
+[gd_scene format=3 uid="uid://b2k3m4n5p6q7"]
+
+[ext_resource type="Script" path="res://enemyitre.gd" id="1_script"]
+[ext_resource type="PackedScene" uid="uid://d1luitijn3c5a" path="res://enemyitre.glb" id="2_model"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
+radius = 0.5
+height = 2.0
+
+[node name="EnemyItre" type="CharacterBody3D"]
+script = ExtResource("1_script")
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("CapsuleShape3D_1")
+
+[node name="Model" type="Node3D" parent="."]
+
+[node name="enemyitre" parent="Model" instance=ExtResource("2_model")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)

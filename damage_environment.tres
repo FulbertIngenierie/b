@@ -1,0 +1,16 @@
+[gd_resource type="Environment" load_steps=2 format=3 uid="uid://damage_env"]
+
+[sub_resource type="Environment" id="Environment_damage"]
+background_mode = 1
+bg_color = Color(0, 0, 0, 1)
+ambient_light_source = 1
+ambient_light_color = Color(0.5, 0.5, 0.5, 1)
+ambient_light_energy = 1.0
+tonemap_mode = 2
+tonemap_exposure = 1.0
+tonemap_white = 1.0
+auto_exposure_enabled = false
+vignette_enabled = true
+vignette_intensity = 0.0
+vignette_opacity = 1.0
+vignette_fade = 0.15

@@ -1,0 +1,11 @@
+Model Information:
+* title:	Psx Cargo Containers
+* source:	https://sketchfab.com/3d-models/psx-cargo-containers-80275406ed094a0d915d2767175e146a
+* author:	Brainsick Games (https://sketchfab.com/BrainsickGames)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Psx Cargo Containers" (https://sketchfab.com/3d-models/psx-cargo-containers-80275406ed094a0d915d2767175e146a) by Brainsick Games (https://sketchfab.com/BrainsickGames) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

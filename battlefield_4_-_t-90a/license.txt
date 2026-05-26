@@ -1,0 +1,11 @@
+Model Information:
+* title:	Battlefield 4 - T-90A
+* source:	https://sketchfab.com/3d-models/battlefield-4-t-90a-60eaa0e780e742e3bdd46fe405487178
+* author:	thientrung2004pr (https://sketchfab.com/U.SSCIFI)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Battlefield 4 - T-90A" (https://sketchfab.com/3d-models/battlefield-4-t-90a-60eaa0e780e742e3bdd46fe405487178) by thientrung2004pr (https://sketchfab.com/U.SSCIFI) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

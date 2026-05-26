@@ -1,0 +1,36 @@
+[gd_scene format=3 uid="uid://basic_shooter_enemy"]
+
+[ext_resource type="Script" path="res://enemy_basic_shooter.gd" id="1_enemy_script"]
+[ext_resource type="PackedScene" uid="uid://basic_shooter_bot" path="res://Basic Shooter Pack/X Bot.fbx" id="2_bot_model"]
+[ext_resource type="AudioStream" uid="uid://bsdyscdy50n8e" path="res://GUNPis_Coup de feu de 357 magnum 9 mm (ID 0438)_LaSonotheque.fr.ogg" id="3_shoot_sound"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_enemy"]
+height = 1.8
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_enemy2"]
+radius = 0.5
+height = 1.0
+
+[node name="EnemyBasicShooter" type="CharacterBody3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, 0)
+collision_layer = 2
+script = ExtResource("1_enemy_script")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+shape = SubResource("CapsuleShape3D_enemy")
+
+[node name="ShootSound" type="AudioStreamPlayer3D" parent="."]
+stream = ExtResource("3_shoot_sound")
+volume_db = 15.0
+max_distance = 500.0
+attenuation_model = 1
+
+[node name="BotModel" parent="." instance=ExtResource("2_bot_model")]
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="BotModel"]
+
+[node name="Head" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.7, 0)
+
+[editable path="BotModel"]

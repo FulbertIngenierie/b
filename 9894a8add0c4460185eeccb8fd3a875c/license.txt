@@ -1,0 +1,8 @@
+Model Information:
+* title:	Sign Знаки
+* source:	https://sketchfab.com/3d-models/sign-9894a8add0c4460185eeccb8fd3a875c
+* author:	dimazverev64 (https://sketchfab.com/dimazverev64)
+
+Model License:
+* license type:	SKETCHFAB Standard (https://sketchfab.com/licenses)
+* requirements:	Under basic restrictions, use worldwide, on all types of media, commercially or not, and in all types of derivative works

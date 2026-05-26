@@ -1,0 +1,11 @@
+Model Information:
+* title:	Battlefield 4 - MRAP
+* source:	https://sketchfab.com/3d-models/battlefield-4-mrap-7a3a07534d0843d2beb6ffde1a5c7deb
+* author:	thientrung2004pr (https://sketchfab.com/U.SSCIFI)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Battlefield 4 - MRAP" (https://sketchfab.com/3d-models/battlefield-4-mrap-7a3a07534d0843d2beb6ffde1a5c7deb) by thientrung2004pr (https://sketchfab.com/U.SSCIFI) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

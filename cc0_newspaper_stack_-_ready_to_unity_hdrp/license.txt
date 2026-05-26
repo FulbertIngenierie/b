@@ -1,0 +1,11 @@
+Model Information:
+* title:	[CC0] Newspaper Stack - Ready to Unity HDRP
+* source:	https://sketchfab.com/3d-models/cc0-newspaper-stack-ready-to-unity-hdrp-c4311a0b918643af97904e10c7a34efc
+* author:	karlwirbelwind (https://sketchfab.com/karlwirbelwind)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "[CC0] Newspaper Stack - Ready to Unity HDRP" (https://sketchfab.com/3d-models/cc0-newspaper-stack-ready-to-unity-hdrp-c4311a0b918643af97904e10c7a34efc) by karlwirbelwind (https://sketchfab.com/karlwirbelwind) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

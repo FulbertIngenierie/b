@@ -1,0 +1,29 @@
+[gd_scene format=3 uid="uid://war_ambience"]
+
+[ext_resource type="Script" path="res://war_ambience.gd" id="1_ambience_script"]
+[ext_resource type="AudioStream" uid="uid://bsdyscdy50n8e" path="res://GUNPis_Coup de feu de 357 magnum 9 mm (ID 0438)_LaSonotheque.fr.ogg" id="2_gun_sound"]
+[ext_resource type="AudioStream" uid="uid://lq8ak7hvkgfi" path="res://GUNPiste.mp3" id="3_ambience_sound"]
+
+[sub_resource type="AudioBusLayout" id="AudioBusLayout_war"]
+
+[node name="WarAmbience" type="Node3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 10, 0)
+script = ExtResource("1_ambience_script")
+
+[node name="AmbiencePlayer" type="AudioStreamPlayer3D" parent="."]
+stream = ExtResource("3_ambience_sound")
+volume_db = -10.0
+max_distance = 1000.0
+attenuation_model = 1
+
+[node name="ExplosionPlayer" type="AudioStreamPlayer3D" parent="."]
+stream = ExtResource("2_gun_sound")
+volume_db = 0.0
+max_distance = 500.0
+attenuation_model = 1
+
+[node name="DistantGunfirePlayer" type="AudioStreamPlayer3D" parent="."]
+stream = ExtResource("2_gun_sound")
+volume_db = -5.0
+max_distance = 800.0
+attenuation_model = 1

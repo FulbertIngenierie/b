@@ -1,0 +1,159 @@
+[gd_scene load_steps=3 format=3 uid="uid://duel_hud"]
+
+[ext_resource type="Script" path="res://duel_hud.gd" id="1_hud_script"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_player_bg"]
+bg_color = Color(0.1, 0.5, 0.9, 0.6)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_enemy_bg"]
+bg_color = Color(0.9, 0.1, 0.1, 0.6)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[node name="DuelHUD" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_hud_script")
+
+[node name="PlayerPanel" type="Panel" parent="."]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = -120.0
+offset_right = 320.0
+offset_bottom = -20.0
+grow_vertical = 0
+
+[node name="PlayerLabel" type="Label" parent="PlayerPanel"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -50.0
+offset_top = 10.0
+offset_right = 50.0
+offset_bottom = 35.0
+grow_horizontal = 2
+theme_type_colors = &"font_color" = Color(0.2, 0.6, 1, 1)
+text = "JOUEUR"
+horizontal_alignment = 1
+
+[node name="PlayerHealthLabel" type="Label" parent="PlayerPanel"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -100.0
+offset_top = 45.0
+offset_right = -10.0
+offset_bottom = 65.0
+grow_horizontal = 0
+text = "VIE: 100"
+horizontal_alignment = 2
+
+[node name="PlayerHealthBar" type="ProgressBar" parent="PlayerPanel"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -100.0
+offset_top = 70.0
+offset_right = -10.0
+offset_bottom = 85.0
+grow_horizontal = 0
+max_value = 100.0
+value = 100.0
+theme_override_styles/fill = SubResource("StyleBoxFlat_player_bg")
+
+[node name="PlayerAmmoLabel" type="Label" parent="PlayerPanel"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -100.0
+offset_top = 90.0
+offset_right = -10.0
+offset_bottom = 110.0
+grow_horizontal = 0
+text = "MUNITIONS: 30"
+horizontal_alignment = 2
+
+[node name="EnemyPanel" type="Panel" parent="."]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -320.0
+offset_top = -120.0
+offset_right = -20.0
+offset_bottom = -20.0
+grow_horizontal = 0
+grow_vertical = 0
+
+[node name="EnemyLabel" type="Label" parent="EnemyPanel"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -50.0
+offset_top = 10.0
+offset_right = 50.0
+offset_bottom = 35.0
+grow_horizontal = 2
+theme_type_colors = &"font_color" = Color(1, 0.2, 0.2, 1)
+text = "ENNEMI"
+horizontal_alignment = 1
+
+[node name="EnemyHealthLabel" type="Label" parent="EnemyPanel"]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = -65.0
+offset_right = 100.0
+offset_bottom = -45.0
+grow_vertical = 0
+text = "VIE: 100"
+horizontal_alignment = 0
+
+[node name="EnemyHealthBar" type="ProgressBar" parent="EnemyPanel"]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = -40.0
+offset_right = 100.0
+offset_bottom = -25.0
+grow_vertical = 0
+max_value = 100.0
+value = 100.0
+theme_override_styles/fill = SubResource("StyleBoxFlat_enemy_bg")
+
+[node name="EnemyAmmoLabel" type="Label" parent="EnemyPanel"]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = -20.0
+offset_right = 100.0
+offset_bottom = 0.0
+grow_vertical = 0
+text = "MUNITIONS: 30"
+horizontal_alignment = 0

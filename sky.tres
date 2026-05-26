@@ -1,0 +1,22 @@
+[gd_resource type="VisualShader" format=3 uid="uid://c6ud4kmpepo4t"]
+
+[ext_resource type="Texture2D" uid="uid://cpeaxtndp2rq5" path="res://Tropical_Environment_Pack_v2.0/Tropical_Environment_Pack_v2.0_Ready/Tropical Rain Forest_Source v2.0/game/art/skies/KapSkyOvercast02/OcastUp.jpg" id="1_o311g"]
+
+[sub_resource type="VisualShaderNodeTexture" id="VisualShaderNodeTexture_5gyc0"]
+texture = ExtResource("1_o311g")
+
+[sub_resource type="VisualShaderNodeColorParameter" id="VisualShaderNodeColorParameter_0w11w"]
+parameter_name = "ColorParameter"
+default_value_enabled = true
+default_value = Color(0.28627452, 0.4, 0.827451, 1)
+
+[resource]
+mode = 3
+flags/use_half_res_pass = false
+flags/use_quarter_res_pass = false
+flags/disable_fog = false
+flags/use_debanding = false
+nodes/sky/3/node = SubResource("VisualShaderNodeTexture_5gyc0")
+nodes/sky/3/position = Vector2(-186.66667, 26.666666)
+nodes/sky/4/node = SubResource("VisualShaderNodeColorParameter_0w11w")
+nodes/sky/4/position = Vector2(53.333332, -80)

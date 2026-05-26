@@ -1,0 +1,41 @@
+[gd_scene format=3 uid="uid://dw4dqnvgxi1vx"]
+
+[ext_resource type="Script" uid="uid://bgs4q10t5yd3a" path="res://kakakaka_fixed.gd" id="1_2356o"]
+[ext_resource type="PackedScene" uid="uid://cvhjvylwharlp" path="res://fps_character_animation_pack_ak-47/scene.gltf" id="1_c0b0o"]
+[ext_resource type="AudioStream" uid="uid://bsdyscdy50n8e" path="res://GUNPis_Coup de feu de 357 magnum 9 mm (ID 0438)_LaSonotheque.fr.ogg" id="3_shoot_sound"]
+[ext_resource type="Environment" uid="uid://damage_env" path="res://damage_environment.tres" id="2_environment"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_t25nk"]
+height = 1.5170898
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_2356o"]
+radius = 0.31835938
+height = 1.1733398
+
+[node name="FPSPlayer" type="CharacterBody3D" unique_id=1068178927]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4554627, 0)
+collision_mask = 3
+velocity = Vector3(0, -2209.0408, 0)
+script = ExtResource("1_2356o")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=950381779]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5695801, 0)
+shape = SubResource("CapsuleShape3D_t25nk")
+
+[node name="ShootSound" type="AudioStreamPlayer3D" parent="." unique_id=583181468]
+stream = ExtResource("3_shoot_sound")
+volume_db = -10.0
+
+[node name="CharacterModel" parent="." unique_id=1403663771 instance=ExtResource("1_c0b0o")]
+
+[node name="CollisionShape3D2" type="CollisionShape3D" parent="." unique_id=299479723]
+shape = SubResource("CapsuleShape3D_2356o")
+
+[node name="Head" type="Node3D" parent="." unique_id=466605440]
+
+[node name="Camera3D" type="Camera3D" parent="Head" unique_id=1499478846]
+transform = Transform3D(-0.9909317, 0, 0.13436672, 0, 1, 0, -0.13436672, 0, -0.9909317, 0, 1.5186014, 0.047786653)
+current = true
+environment = ExtResource("2_environment")
+
+[editable path="CharacterModel"]
