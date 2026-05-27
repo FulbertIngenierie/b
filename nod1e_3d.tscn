@@ -67,6 +67,7 @@
 [ext_resource type="PackedScene" uid="uid://crosshair" path="res://Crosshair.tscn" id="70_crosshair"]
 [ext_resource type="PackedScene" path="res://PauseMenu.tscn" id="71_pause_menu"]
 [ext_resource type="Script" uid="uid://cv5di0gbscl7b" path="res://ai_director.gd" id="72_ai_director"]
+[ext_resource type="PackedScene" uid="uid://enemy_bad_scene" path="res://Enemy_bad.tscn" id="73_enemy_bad"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_l2x6l"]
 albedo_texture = ExtResource("3_0yo45")
@@ -5715,6 +5716,22 @@ shape = SubResource("CapsuleShape3D_fo65l")
 [node name="Crosshair" parent="CanvasLayer" unique_id=787199680 instance=ExtResource("70_crosshair")]
 
 [node name="PauseMenu" parent="CanvasLayer" unique_id=2068859334 instance=ExtResource("71_pause_menu")]
+
+[node name="Enemy_bad1" parent="." instance=ExtResource("73_enemy_bad")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 0, -20)
+variant_id = 0
+
+[node name="Enemy_bad2" parent="." instance=ExtResource("73_enemy_bad")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -18, 0, -25)
+variant_id = 1
+
+[node name="Enemy_bad3" parent="." instance=ExtResource("73_enemy_bad")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25, 0, -35)
+variant_id = 2
+
+[node name="Enemy_bad4" parent="." instance=ExtResource("73_enemy_bad")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0, -40)
+variant_id = 3
 
 [node name="AIDirector" type="Node" parent="." unique_id=1069176309]
 script = ExtResource("72_ai_director")
