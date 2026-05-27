@@ -162,6 +162,9 @@ func _ready():
 	
 	if anim_player:
 		_ensure_animations_loop()
+		print("[", name, "] AnimationPlayer trouvé avec ", anim_player.get_animation_list().size(), " animations")
+	else:
+		print("[", name, "] ATTENTION: Aucun AnimationPlayer trouvé!")
 	
 	_play_anim("idle", anim_idle)
 
@@ -796,18 +799,30 @@ func _generate_patrol_points():
 		patrol_points.append(point)
 
 func _init_animation_player():
-	if has_node("AnimationPlayer"):
+	# Chercher TOUS les AnimationPlayer et prendre celui qui a des animations
+	var best_anim_player: AnimationPlayer = null
+	var best_count := 0
+	
+	# Chercher dans tout l'arbre du nœud
+	var all_players = _find_all_animation_players(self)
+	for ap in all_players:
+		var count = ap.get_animation_list().size()
+		if count > best_count:
+			best_count = count
+			best_anim_player = ap
+	
+	if best_anim_player:
+		anim_player = best_anim_player
+	elif has_node("AnimationPlayer"):
 		anim_player = $AnimationPlayer
-		if anim_player.get_animation_list().size() == 0 and has_node("Model"):
-			var model_anim = $Model.find_child("AnimationPlayer", true, false)
-			if model_anim and model_anim.get_animation_list().size() > 0:
-				anim_player = model_anim
-	elif has_node("Model"):
-		var model_anim = $Model.find_child("AnimationPlayer", true, false)
-		if model_anim:
-			anim_player = model_anim
-	else:
-		anim_player = find_child("AnimationPlayer", true, false)
+
+func _find_all_animation_players(node: Node) -> Array:
+	var result := []
+	if node is AnimationPlayer:
+		result.append(node)
+	for child in node.get_children():
+		result.append_array(_find_all_animation_players(child))
+	return result
 
 func _cache_animation_names():
 	if not anim_player:

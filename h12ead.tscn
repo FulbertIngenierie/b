@@ -21,8 +21,6 @@ script = ExtResource("2_845wx")
 
 [node name="Model" parent="Edo_Kpessé" unique_id=634299524 instance=ExtResource("1_f41lm")]
 
-[node name="AnimationPlayer" type="AnimationPlayer" parent="Edo_Kpessé"]
-
 [node name="ShootSound" type="AudioStreamPlayer3D" parent="Edo_Kpessé"]
 stream = ExtResource("4_gun_sound")
 volume_db = 10.0
