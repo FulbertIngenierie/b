@@ -37,7 +37,7 @@ var speed := 2.5
 var run_speed := 4.5
 var detection_range := 80.0
 var attack_range := 45.0
-var damage := 10.0
+var damage := 0.1
 var gravity := 20.0
 
 # =========================================================
