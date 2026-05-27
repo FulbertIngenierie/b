@@ -158,8 +158,8 @@ var zoom_speed := 10.0
 # =========================================================
 
 var current_anim = ""
-var health = 100
-var max_health = 100
+var health = 999
+var max_health = 999
 var ammo = 30
 var max_ammo = 30
 var total_ammo = 120
@@ -169,8 +169,8 @@ var is_dead = false
 # RÉGÉNÉRATION DE VIE
 # =========================================================
 
-var regen_delay := 4.0
-var regen_rate := 15.0
+var regen_delay := 2.0
+var regen_rate := 50.0
 var time_since_damage := 0.0
 
 # =========================================================
@@ -816,16 +816,56 @@ func create_impact(pos, normal_vec, collider = null):
 		if "is_dead" in collider and collider.is_dead:
 			_on_enemy_killed(is_headshot)
 	
-	impact.look_at(pos + normal_vec, Vector3.UP)
+	var safe_normal = normal_vec
+	if safe_normal.is_equal_approx(Vector3.UP) or safe_normal.is_equal_approx(Vector3.DOWN):
+		safe_normal = Vector3(0.01, normal_vec.y, 0.01).normalized()
+	if safe_normal.length() > 0.001:
+		impact.look_at(pos + safe_normal, Vector3.UP)
 	
 	if bullet_impact_scene:
 		var particles = bullet_impact_scene.instantiate()
 		if particles:
 			get_tree().current_scene.add_child(particles)
 			particles.global_position = pos
-			particles.look_at(pos + normal_vec, Vector3.UP)
+			if safe_normal.length() > 0.001:
+				particles.look_at(pos + safe_normal, Vector3.UP)
 			particles.emitting = true
 			particles.one_shot = true
+	
+	# Effet sang/taches rouges sur ennemis
+	if collider and is_instance_valid(collider) and collider.has_method("take_damage"):
+		_spawn_blood_effect(pos)
+
+# =========================================================
+# BLOOD EFFECT — taches de sang
+# =========================================================
+
+func _spawn_blood_effect(pos: Vector3):
+	# Tache de sang 3D (plusieurs particules rouges)
+	for i in range(3):
+		var blood = MeshInstance3D.new()
+		var quad = QuadMesh.new()
+		quad.size = Vector2(0.15, 0.15)
+		blood.mesh = quad
+		var mat = StandardMaterial3D.new()
+		mat.albedo_color = Color(0.6, 0.0, 0.0, 0.9)
+		mat.emission_enabled = true
+		mat.emission = Color(0.4, 0.0, 0.0, 1)
+		mat.emission_energy_multiplier = 2.0
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+		mat.no_depth_test = true
+		blood.material_override = mat
+		get_tree().current_scene.add_child(blood)
+		blood.global_position = pos + Vector3(
+			randf_range(-0.3, 0.3),
+			randf_range(-0.2, 0.4),
+			randf_range(-0.3, 0.3)
+		)
+		# Auto-destruction après 1.5s
+		var tween = get_tree().create_tween()
+		tween.tween_property(blood, "scale", Vector3.ZERO, 1.5).set_delay(0.5)
+		tween.tween_callback(blood.queue_free)
 
 # =========================================================
 # HIT MARKER — headshot = rouge
@@ -1082,12 +1122,14 @@ func play_idle():
 # =========================================================
 
 func take_damage(amount):
-	health -= amount
+	# Joueur très résistant
+	var reduced = int(amount * 0.3)
+	health -= reduced
 	time_since_damage = 0.0
 	if ai_director:
 		ai_director.register_player_damage()
 	damage_flash_timer = 0.4
-	camera_shake_intensity = clamp(float(amount) / 20.0, 0.3, 1.5)
+	camera_shake_intensity = clamp(float(reduced) / 20.0, 0.2, 0.8)
 
 	if damage_sound:
 		damage_sound.pitch_scale = randf_range(0.8, 1.2)
@@ -1219,8 +1261,8 @@ func _grenade_explode(grenade: Node3D):
 		return
 	
 	var explosion_pos = grenade.global_position
-	var explosion_radius = 8.0
-	var explosion_damage = 80
+	var explosion_radius = 10.0
+	var explosion_damage = 120
 	
 	var enemies = get_tree().get_nodes_in_group("enemies")
 	for enemy in enemies:
@@ -1234,15 +1276,99 @@ func _grenade_explode(grenade: Node3D):
 				if "is_dead" in enemy and enemy.is_dead:
 					_on_enemy_killed(false)
 	
-	if hit_effect_scene:
-		for i in range(5):
-			var effect = hit_effect_scene.instantiate()
-			get_tree().current_scene.add_child(effect)
-			effect.global_position = explosion_pos + Vector3(randf_range(-2, 2), randf_range(0, 3), randf_range(-2, 2))
-			effect.emitting = true
-			effect.one_shot = true
+	# VFX explosion pro
+	_spawn_explosion_vfx(explosion_pos)
+	
+	# Camera shake si proche
+	var player_dist = global_position.distance_to(explosion_pos)
+	if player_dist < 20.0:
+		camera_shake_intensity = clamp((20.0 - player_dist) / 10.0, 0.3, 2.0)
+		damage_flash_timer = 0.2
 	
 	grenade.queue_free()
+
+func _spawn_explosion_vfx(pos: Vector3):
+	# Boule de feu principale
+	var fireball = MeshInstance3D.new()
+	var sphere_mesh = SphereMesh.new()
+	sphere_mesh.radius = 0.5
+	sphere_mesh.height = 1.0
+	fireball.mesh = sphere_mesh
+	var fire_mat = StandardMaterial3D.new()
+	fire_mat.albedo_color = Color(1, 0.5, 0, 0.9)
+	fire_mat.emission_enabled = true
+	fire_mat.emission = Color(1, 0.4, 0, 1)
+	fire_mat.emission_energy_multiplier = 10.0
+	fire_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	fire_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	fireball.material_override = fire_mat
+	get_tree().current_scene.add_child(fireball)
+	fireball.global_position = pos + Vector3(0, 0.5, 0)
+	
+	# Animation explosion
+	var tween = get_tree().create_tween()
+	tween.tween_property(fireball, "scale", Vector3.ONE * 6.0, 0.3)
+	tween.parallel().tween_property(fire_mat, "albedo_color", Color(0.3, 0.1, 0, 0), 0.8)
+	tween.tween_callback(fireball.queue_free)
+	
+	# Éclats/débris
+	for i in range(8):
+		var debris = MeshInstance3D.new()
+		var box_mesh = BoxMesh.new()
+		box_mesh.size = Vector3(0.1, 0.1, 0.1)
+		debris.mesh = box_mesh
+		var d_mat = StandardMaterial3D.new()
+		d_mat.albedo_color = Color(0.3, 0.2, 0.1, 1)
+		debris.material_override = d_mat
+		get_tree().current_scene.add_child(debris)
+		debris.global_position = pos + Vector3(
+			randf_range(-0.5, 0.5),
+			randf_range(0, 1),
+			randf_range(-0.5, 0.5)
+		)
+		var d_tween = get_tree().create_tween()
+		var end_pos = debris.global_position + Vector3(
+			randf_range(-4, 4),
+			randf_range(2, 5),
+			randf_range(-4, 4)
+		)
+		d_tween.tween_property(debris, "global_position", end_pos, 0.6)
+		d_tween.tween_property(debris, "scale", Vector3.ZERO, 0.3)
+		d_tween.tween_callback(debris.queue_free)
+	
+	# Particules de fumée
+	for i in range(5):
+		var smoke = MeshInstance3D.new()
+		var s_quad = QuadMesh.new()
+		s_quad.size = Vector2(1.5, 1.5)
+		smoke.mesh = s_quad
+		var s_mat = StandardMaterial3D.new()
+		s_mat.albedo_color = Color(0.3, 0.3, 0.3, 0.6)
+		s_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		s_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+		smoke.material_override = s_mat
+		get_tree().current_scene.add_child(smoke)
+		smoke.global_position = pos + Vector3(
+			randf_range(-1, 1),
+			randf_range(0.5, 2),
+			randf_range(-1, 1)
+		)
+		var s_tween = get_tree().create_tween()
+		s_tween.tween_property(smoke, "global_position", smoke.global_position + Vector3(0, 3, 0), 2.0)
+		s_tween.parallel().tween_property(s_mat, "albedo_color", Color(0.2, 0.2, 0.2, 0), 2.0)
+		s_tween.parallel().tween_property(smoke, "scale", Vector3.ONE * 3.0, 2.0)
+		s_tween.tween_callback(smoke.queue_free)
+	
+	# Flash lumineux
+	var light = OmniLight3D.new()
+	light.light_color = Color(1, 0.6, 0.1, 1)
+	light.light_energy = 8.0
+	light.omni_range = 15.0
+	get_tree().current_scene.add_child(light)
+	light.global_position = pos + Vector3(0, 1, 0)
+	var l_tween = get_tree().create_tween()
+	l_tween.tween_property(light, "light_energy", 0.0, 0.5)
+	l_tween.tween_callback(light.queue_free)
 
 # =========================================================
 # UI CREATION
@@ -1458,7 +1584,7 @@ func _create_grenade_label():
 	grenade_label = Label.new()
 	grenade_label.name = "GrenadeLabel"
 	grenade_label.text = "GRENADES: 3"
-	grenade_label.add_theme_font_size_override("font_size", 16)
+	grenade_label.add_theme_font_size_override("font_size", 18)
 	grenade_label.add_theme_color_override("font_color", Color(0.8, 1, 0.5, 0.9))
 	grenade_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
 	grenade_label.add_theme_constant_override("shadow_offset_x", 1)

@@ -233,6 +233,10 @@ func _update_timers(delta):
 	
 	state_timer += delta
 	
+	# Cooldown anti-élastique
+	if state_change_cooldown > 0:
+		state_change_cooldown -= delta
+	
 	# Reaction timer
 	if can_see_target and reaction_timer < reaction_delay + 1.0:
 		reaction_timer += delta
@@ -328,7 +332,13 @@ func _decide():
 				cover_position = Vector3.ZERO
 				_transition_to(BTState.ENGAGE_ADVANCE)
 
+var state_change_cooldown := 0.0
+
 func _transition_to(new_state: BTState):
+	# Anti-élastique : empêcher les transitions trop rapides
+	if state_change_cooldown > 0:
+		return
+	state_change_cooldown = 1.0
 	bt_state = new_state
 	state_timer = 0.0
 	
@@ -640,14 +650,19 @@ func _create_impact(pos, normal_vec):
 	if impact:
 		get_tree().current_scene.add_child(impact)
 		impact.global_position = pos + normal_vec * 0.02
-		if normal_vec != Vector3.ZERO:
-			impact.look_at(pos + normal_vec, Vector3.UP)
+		# Fix vecteurs colinéaires
+		var safe_normal = normal_vec
+		if safe_normal.is_equal_approx(Vector3.UP) or safe_normal.is_equal_approx(Vector3.DOWN) or safe_normal.length() < 0.001:
+			safe_normal = Vector3(0.01, normal_vec.y if normal_vec.length() > 0 else 1.0, 0.01).normalized()
+		if safe_normal != Vector3.ZERO:
+			impact.look_at(pos + safe_normal, Vector3.UP)
 	if bullet_impact_scene:
 		var particles = bullet_impact_scene.instantiate()
 		if particles:
 			get_tree().current_scene.add_child(particles)
 			particles.global_position = pos
-			particles.look_at(pos + normal_vec, Vector3.UP)
+			if safe_normal != Vector3.ZERO:
+				particles.look_at(pos + safe_normal, Vector3.UP)
 			particles.emitting = true
 			particles.one_shot = true
 
@@ -783,12 +798,21 @@ func take_damage(amount):
 	# Notifier l'AI Director
 	if ai_director:
 		ai_director.register_hit()
+	# Effet de sang
+	if is_inside_tree() and get_tree():
+		_spawn_blood_splatter()
 	if hit_effect_scene and is_inside_tree():
 		var hit_effect = hit_effect_scene.instantiate()
 		add_child(hit_effect)
 		hit_effect.global_position = global_position + Vector3(0, 1.5, 0)
 		hit_effect.emitting = true
 		hit_effect.one_shot = true
+	# Réaction au dégâts
+	if not is_dead and health > 0:
+		if bt_state == BTState.PATROL:
+			_transition_to(BTState.INVESTIGATE)
+		elif bt_state == BTState.INVESTIGATE:
+			_transition_to(BTState.ENGAGE_ADVANCE)
 	if health <= 0:
 		die()
 
@@ -802,11 +826,12 @@ func die():
 	velocity = Vector3.ZERO
 	if anim_player and anim_die != "":
 		anim_player.play(anim_die)
-	if hit_effect_scene and is_inside_tree():
+	if hit_effect_scene and is_inside_tree() and get_tree():
 		var hit_effect = hit_effect_scene.instantiate()
-		hit_effect.global_position = global_position + Vector3(0, 1.5, 0)
-		get_tree().current_scene.add_child(hit_effect)
-		hit_effect.emitting = true
+		if hit_effect:
+			get_tree().current_scene.add_child(hit_effect)
+			hit_effect.global_position = global_position + Vector3(0, 1.5, 0)
+			hit_effect.emitting = true
 	# L'ENNEMI RESTE AU SOL — PAS DE RESPAWN, PAS DE TÉLÉPORTATION
 
 # =========================================================
@@ -925,6 +950,36 @@ func _get_animation_resource(a_name: String) -> Animation:
 	if anim_player.has_animation(a_name):
 		return anim_player.get_animation(a_name)
 	return null
+
+# =========================================================
+# BLOOD SPLATTER — effet sang ennemi
+# =========================================================
+
+func _spawn_blood_splatter():
+	if not is_inside_tree() or not get_tree():
+		return
+	for i in range(4):
+		var blood = MeshInstance3D.new()
+		var quad = QuadMesh.new()
+		quad.size = Vector2(0.2, 0.2)
+		blood.mesh = quad
+		var mat = StandardMaterial3D.new()
+		mat.albedo_color = Color(0.7, 0.0, 0.0, 0.85)
+		mat.emission_enabled = true
+		mat.emission = Color(0.5, 0.0, 0.0, 1)
+		mat.emission_energy_multiplier = 2.0
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+		blood.material_override = mat
+		get_tree().current_scene.add_child(blood)
+		blood.global_position = global_position + Vector3(
+			randf_range(-0.4, 0.4),
+			randf_range(0.8, 1.8),
+			randf_range(-0.4, 0.4)
+		)
+		var tween = get_tree().create_tween()
+		tween.tween_property(blood, "scale", Vector3.ZERO, 1.2).set_delay(0.3)
+		tween.tween_callback(blood.queue_free)
 
 # Compatibilité avec les anciens appels
 func shoot_at_player():
