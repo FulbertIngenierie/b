@@ -646,14 +646,15 @@ func _add_bullet(bullet, spawn_pos: Vector3, direction: Vector3):
 func _create_impact(pos, normal_vec):
 	if impact_scene == null or not get_tree():
 		return
+	# Fix vecteurs colinéaires
+	var safe_normal = normal_vec
+	if safe_normal.is_equal_approx(Vector3.UP) or safe_normal.is_equal_approx(Vector3.DOWN) or safe_normal.length() < 0.001:
+		safe_normal = Vector3(0.01, normal_vec.y if normal_vec.length() > 0 else 1.0, 0.01).normalized()
+	
 	var impact = impact_scene.instantiate()
 	if impact:
 		get_tree().current_scene.add_child(impact)
 		impact.global_position = pos + normal_vec * 0.02
-		# Fix vecteurs colinéaires
-		var safe_normal = normal_vec
-		if safe_normal.is_equal_approx(Vector3.UP) or safe_normal.is_equal_approx(Vector3.DOWN) or safe_normal.length() < 0.001:
-			safe_normal = Vector3(0.01, normal_vec.y if normal_vec.length() > 0 else 1.0, 0.01).normalized()
 		if safe_normal != Vector3.ZERO:
 			impact.look_at(pos + safe_normal, Vector3.UP)
 	if bullet_impact_scene:
