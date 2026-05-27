@@ -715,28 +715,42 @@ func _apply_recoil():
 func _create_muzzle_flash():
 	if not gun_tip:
 		return
+	# Effet réaliste: sphère lumineuse (pas un carré)
 	muzzle_flash = MeshInstance3D.new()
-	var quad = QuadMesh.new()
-	quad.size = Vector2(0.08, 0.08)
-	muzzle_flash.mesh = quad
+	var sphere = SphereMesh.new()
+	sphere.radius = 0.03
+	sphere.height = 0.06
+	muzzle_flash.mesh = sphere
 	var mat = StandardMaterial3D.new()
 	mat.emission_enabled = true
-	mat.emission = Color(1, 0.8, 0.2, 1)
-	mat.emission_energy_multiplier = 5.0
-	mat.albedo_color = Color(1, 0.7, 0.1, 1)
+	mat.emission = Color(1, 0.85, 0.3, 1)
+	mat.emission_energy_multiplier = 12.0
+	mat.albedo_color = Color(1, 0.9, 0.4, 1)
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
 	mat.no_depth_test = true
 	muzzle_flash.material_override = mat
 	muzzle_flash.visible = false
 	gun_tip.add_child(muzzle_flash)
+	
+	# Lumière dynamique au bout du canon
+	var muzzle_light = OmniLight3D.new()
+	muzzle_light.name = "MuzzleLight"
+	muzzle_light.light_color = Color(1, 0.7, 0.2)
+	muzzle_light.light_energy = 0.0
+	muzzle_light.omni_range = 3.0
+	gun_tip.add_child(muzzle_light)
 
 func _show_muzzle_flash():
-	muzzle_flash_timer = 0.04
+	muzzle_flash_timer = 0.05
 	if muzzle_flash:
 		muzzle_flash.visible = true
-		muzzle_flash.scale = Vector3.ONE * randf_range(0.6, 1.0)
-		muzzle_flash.rotation.z = randf() * PI * 2.0
+		muzzle_flash.scale = Vector3.ONE * randf_range(0.8, 1.3)
+		# Lumière flash
+		var ml = gun_tip.get_node_or_null("MuzzleLight")
+		if ml:
+			ml.light_energy = randf_range(3.0, 5.0)
+			var tw = get_tree().create_tween()
+			tw.tween_property(ml, "light_energy", 0.0, 0.06)
 
 # =========================================================
 # SHOOT SYSTEM
@@ -781,6 +795,41 @@ func shoot():
 
 	if result:
 		create_impact(result.position, result.normal, result.collider)
+		# Tracer VFX — ligne lumineuse entre canon et point d'impact
+		_spawn_bullet_tracer(gun_tip.global_position, result.position)
+	else:
+		_spawn_bullet_tracer(gun_tip.global_position, gun_tip.global_position + direction * 100.0)
+
+# =========================================================
+# BULLET TRACER VFX
+# =========================================================
+
+func _spawn_bullet_tracer(from_pos: Vector3, to_pos: Vector3):
+	var tracer = MeshInstance3D.new()
+	var cyl = CylinderMesh.new()
+	var dist = from_pos.distance_to(to_pos)
+	cyl.top_radius = 0.003
+	cyl.bottom_radius = 0.003
+	cyl.height = dist
+	tracer.mesh = cyl
+	var mat = StandardMaterial3D.new()
+	mat.albedo_color = Color(1, 0.9, 0.3, 0.7)
+	mat.emission_enabled = true
+	mat.emission = Color(1, 0.85, 0.2, 1)
+	mat.emission_energy_multiplier = 6.0
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.no_depth_test = true
+	tracer.material_override = mat
+	get_tree().current_scene.add_child(tracer)
+	var mid = (from_pos + to_pos) / 2.0
+	tracer.global_position = mid
+	var dir = (to_pos - from_pos).normalized()
+	if dir.length() > 0.001:
+		tracer.look_at(tracer.global_position + dir, Vector3.UP)
+		tracer.rotate_object_local(Vector3(1, 0, 0), PI / 2.0)
+	var tw = get_tree().create_tween()
+	tw.tween_property(mat, "albedo_color", Color(1, 0.9, 0.3, 0.0), 0.08)
+	tw.tween_callback(tracer.queue_free)
 
 # =========================================================
 # VISUAL IMPACT

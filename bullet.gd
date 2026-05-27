@@ -62,7 +62,11 @@ func _on_body_entered(body):
 	if "is_dead" in body and body.is_dead:
 		queue_free()
 		return
-	# Si c'est un ennemi, appliquer des dégâts
+	# Si tirée par un ennemi, ne pas toucher les autres ennemis
+	if has_meta("fired_by_enemy") and get_meta("fired_by_enemy"):
+		if body.is_in_group("enemies") or body.is_in_group("enemy_target"):
+			return
+	# Si c'est une cible valide, appliquer des dégâts
 	if body.has_method("take_damage"):
 		body.take_damage(damage)
 		queue_free()
@@ -74,12 +78,15 @@ func _on_area_entered(area):
 	if not area or not is_instance_valid(area):
 		queue_free()
 		return
-	# Si l'area appartient à un ennemi, appliquer des dégâts
 	var area_owner = area.owner
 	if area_owner and is_instance_valid(area_owner) and area_owner.is_inside_tree():
 		if "is_dead" in area_owner and area_owner.is_dead:
 			queue_free()
 			return
+		# Si tirée par un ennemi, ne pas toucher les autres ennemis
+		if has_meta("fired_by_enemy") and get_meta("fired_by_enemy"):
+			if area_owner.is_in_group("enemies") or area_owner.is_in_group("enemy_target"):
+				return
 		if area_owner.has_method("take_damage"):
 			area_owner.take_damage(damage)
 			queue_free()

@@ -616,6 +616,7 @@ func _fire_bullet():
 	
 	var bullet = bullet_scene.instantiate()
 	bullet.direction = direction
+	bullet.set_meta("fired_by_enemy", true)
 	call_deferred("_add_bullet", bullet, spawn_pos, direction)
 	
 	# Hitscan pour dégâts immédiats
@@ -627,8 +628,8 @@ func _fire_bullet():
 	
 	if result:
 		var collider = result.collider
-		if collider != null and collider.has_method("take_damage"):
-			# Dégâts adaptatifs (AI Director)
+		# SEULEMENT tirer sur le joueur, pas les autres ennemis
+		if collider != null and collider == player and collider.has_method("take_damage"):
 			var actual_damage = damage
 			if ai_director:
 				actual_damage = ai_director.get_enemy_damage()
