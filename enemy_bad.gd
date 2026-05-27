@@ -179,7 +179,6 @@ var all_anims: PackedStringArray = []
 
 func _ready():
 	_init_animation_player()
-	_setup_animation_tree()
 	_assign_variant_animations()
 	find_player()
 	add_to_group("enemies")
@@ -194,9 +193,23 @@ func _ready():
 	
 	if anim_player:
 		_ensure_animations_loop()
-		print("[", name, "] (variant ", variant_id, ") AnimationPlayer avec ", anim_player.get_animation_list().size(), " animations")
+		var anim_list = anim_player.get_animation_list()
+		print("[", name, "] (variant ", variant_id, ") AnimationPlayer: ", anim_player.name, " — ", anim_list.size(), " animations")
+		for a in anim_list:
+			print("  -> ", a)
+		print("  idle=", anim_idle, " walk=", anim_walk, " shoot=", anim_shoot, " die=", anim_die)
 	else:
 		print("[", name, "] ATTENTION: Aucun AnimationPlayer trouvé!")
+		# Chercher dans les enfants différés (GLB pas encore chargé)
+		print("  Enfants directs: ")
+		for child in get_children():
+			print("    - ", child.name, " (", child.get_class(), ")")
+			for sub in child.get_children():
+				print("      - ", sub.name, " (", sub.get_class(), ")")
+	
+	# Configurer AnimationTree APRÈS avoir vérifié que AnimationPlayer fonctionne
+	if anim_player and all_anims.size() > 0:
+		_setup_animation_tree()
 	
 	_play_anim("idle", anim_idle)
 
@@ -231,7 +244,7 @@ func _assign_variant_animations():
 			anim_shoot = _find_anim(["tir avanc"])
 			anim_shoot_walk = _find_anim(["effet de balle marche"])
 			anim_reload = _find_anim(["recharge run"])
-			anim_die = _find_anim(["die"])
+			anim_die = _find_anim_exact("die")
 			anim_crouch = _find_anim(["tir+cover"])
 			anim_melee = _find_anim(["corps"])
 			anim_grenade = _find_anim(["grenade"])
@@ -255,7 +268,7 @@ func _assign_variant_animations():
 			anim_shoot = _find_anim(["tir debout"])
 			anim_shoot_walk = _find_anim(["tir avanc"])
 			anim_reload = _find_anim(["recharge run"])
-			anim_die = _find_anim(["die"])
+			anim_die = _find_anim_exact("die")
 			anim_crouch = _find_anim(["tir+cover"])
 			anim_melee = _find_anim(["corps"])
 			anim_grenade = _find_anim(["grenade"])
@@ -268,6 +281,7 @@ func _setup_animation_tree():
 	if not anim_player:
 		return
 	
+	# Créer AnimationTree avec BlendTree pour transitions fluides
 	anim_tree = AnimationTree.new()
 	anim_tree.name = "AnimationTree"
 	
@@ -282,10 +296,22 @@ func _setup_animation_tree():
 		state_machine.add_node(safe_name, node, Vector2(0, 0))
 		anims_to_add[a_name] = safe_name
 	
+	# Ajouter transitions entre tous les nœuds
+	var node_names = anims_to_add.values()
+	for i in range(node_names.size()):
+		for j in range(node_names.size()):
+			if i != j:
+				var transition = AnimationNodeStateMachineTransition.new()
+				transition.xfade_time = 0.25
+				state_machine.add_transition(node_names[i], node_names[j], transition)
+	
 	anim_tree.tree_root = state_machine
 	anim_tree.anim_player = anim_player.get_path()
-	anim_tree.active = true
+	# NE PAS activer — on utilise AnimationPlayer.play() directement
+	# AnimationTree sera activé plus tard quand les transitions seront configurées
+	anim_tree.active = false
 	add_child(anim_tree)
+	print("[", name, "] AnimationTree créé (inactif — transitions prêtes)")
 
 # =========================================================
 # PHYSICS PROCESS — BEHAVIOR TREE TICK
@@ -802,8 +828,17 @@ func _play_anim(tag: String, a_name: String):
 			a_name = all_anims[0]
 		else:
 			return
+	# Chercher l'animation par nom exact ou partiel
 	if not anim_player.has_animation(a_name):
-		return
+		# Essayer avec le préfixe de librairie
+		var found := false
+		for lib_anim in anim_player.get_animation_list():
+			if lib_anim == a_name or lib_anim.ends_with("/" + a_name) or lib_anim.to_lower().contains(a_name.to_lower()):
+				a_name = lib_anim
+				found = true
+				break
+		if not found:
+			return
 	if current_anim == tag and anim_player.is_playing():
 		return
 	anim_player.play(a_name)
@@ -937,15 +972,19 @@ func _init_animation_player():
 	var best_anim_player: AnimationPlayer = null
 	var best_count := 0
 	var all_players = _find_all_animation_players(self)
+	print("[", name, "] Recherche AnimationPlayer — ", all_players.size(), " trouvés")
 	for ap in all_players:
 		var count = ap.get_animation_list().size()
+		print("  -> ", ap.name, " (", ap.get_path(), ") : ", count, " animations")
 		if count > best_count:
 			best_count = count
 			best_anim_player = ap
 	if best_anim_player:
 		anim_player = best_anim_player
+		print("[", name, "] AnimationPlayer sélectionné: ", anim_player.get_path(), " (", best_count, " anims)")
 	elif has_node("AnimationPlayer"):
 		anim_player = $AnimationPlayer
+		print("[", name, "] Fallback AnimationPlayer: ", anim_player.get_path())
 
 func _find_all_animation_players(node: Node) -> Array:
 	var result := []
@@ -955,11 +994,34 @@ func _find_all_animation_players(node: Node) -> Array:
 		result.append_array(_find_all_animation_players(child))
 	return result
 
+func _find_anim_exact(search_name: String) -> String:
+	# Cherche un nom exact (sans confondre "die" et "die1")
+	for a in all_anims:
+		var a_clean = a
+		if "/" in a:
+			a_clean = a.substr(a.rfind("/") + 1)
+		if a_clean.strip_edges().to_lower() == search_name.strip_edges().to_lower():
+			return a
+	# Fallback : cherche avec contains
+	return _find_anim([search_name])
+
 func _find_anim(candidates: Array) -> String:
 	for anim_name in candidates:
 		for a in all_anims:
-			if a.to_lower().contains(anim_name.to_lower()):
+			# Chercher dans le nom complet (peut avoir un préfixe de librairie)
+			var a_lower = a.to_lower()
+			var search_lower = anim_name.to_lower()
+			if a_lower.contains(search_lower):
 				return a
+			# Chercher aussi sans le préfixe de librairie
+			if "/" in a:
+				var after_slash = a.substr(a.find("/") + 1)
+				if after_slash.to_lower().contains(search_lower):
+					return a
+	# Si rien trouvé, retourner la première animation disponible
+	if all_anims.size() > 0:
+		print("[WARN] Animation non trouvée pour ", candidates, " — fallback: ", all_anims[0])
+		return all_anims[0]
 	return ""
 
 func _ensure_animations_loop():
