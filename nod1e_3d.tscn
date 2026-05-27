@@ -70,6 +70,7 @@
 [ext_resource type="PackedScene" uid="uid://duel_hud" path="res://DuelHUD.tscn" id="69_hud"]
 [ext_resource type="PackedScene" uid="uid://crosshair" path="res://Crosshair.tscn" id="70_crosshair"]
 [ext_resource type="PackedScene" uid="uid://pause_menu" path="res://PauseMenu.tscn" id="71_pause_menu"]
+[ext_resource type="Script" path="res://ai_director.gd" id="72_ai_director"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_l2x6l"]
 albedo_texture = ExtResource("3_0yo45")
@@ -5720,6 +5721,9 @@ shape = SubResource("CapsuleShape3D_fo65l")
 [node name="Crosshair" parent="CanvasLayer" instance=ExtResource("70_crosshair")]
 
 [node name="PauseMenu" parent="CanvasLayer" instance=ExtResource("71_pause_menu")]
+
+[node name="AIDirector" type="Node" parent="."]
+script = ExtResource("72_ai_director")
 
 [node name="Head" parent="." unique_id=1376506799 instance=ExtResource("67_sqnuf")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.23196828, -1.2364808)

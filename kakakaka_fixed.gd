@@ -229,6 +229,7 @@ var kill_confirm_label: Label = null
 var killstreak_rewards := {3: "RADAR", 5: "TOURELLE", 7: "DRONE", 10: "MISSILE"}
 var active_killstreaks: Array[String] = []
 var killstreak_label: Label = null
+var ai_director = null
 var radar_active := false
 var radar_timer := 0.0
 var radar_duration := 15.0
@@ -268,6 +269,7 @@ func _ready():
 	_create_muzzle_flash()
 	_create_kill_confirm_label()
 	_create_killstreak_label()
+	_find_ai_director()
 	
 	_switch_weapon(0)
 
@@ -641,6 +643,11 @@ func aim_at_nearest_enemy():
 # SHOOT ONCE — avec GUNFEEL
 # =========================================================
 
+func _find_ai_director():
+	var directors = get_tree().get_nodes_in_group("ai_director")
+	if directors.size() > 0:
+		ai_director = directors[0]
+
 func shoot_once():
 	var fire_anim = ""
 	if is_aiming:
@@ -669,6 +676,8 @@ func shoot_once():
 	camera_shake_intensity = max(camera_shake_intensity, shoot_shake_amount)
 
 	# Tir
+	if ai_director:
+		ai_director.register_shot()
 	var pellets = weapon_pellets[current_weapon]
 	for i in range(pellets):
 		shoot()
@@ -708,12 +717,12 @@ func _create_muzzle_flash():
 		return
 	muzzle_flash = MeshInstance3D.new()
 	var quad = QuadMesh.new()
-	quad.size = Vector2(0.3, 0.3)
+	quad.size = Vector2(0.08, 0.08)
 	muzzle_flash.mesh = quad
 	var mat = StandardMaterial3D.new()
 	mat.emission_enabled = true
 	mat.emission = Color(1, 0.8, 0.2, 1)
-	mat.emission_energy_multiplier = 8.0
+	mat.emission_energy_multiplier = 5.0
 	mat.albedo_color = Color(1, 0.7, 0.1, 1)
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
@@ -723,10 +732,10 @@ func _create_muzzle_flash():
 	gun_tip.add_child(muzzle_flash)
 
 func _show_muzzle_flash():
-	muzzle_flash_timer = 0.05
+	muzzle_flash_timer = 0.04
 	if muzzle_flash:
 		muzzle_flash.visible = true
-		muzzle_flash.scale = Vector3.ONE * randf_range(0.8, 1.3)
+		muzzle_flash.scale = Vector3.ONE * randf_range(0.6, 1.0)
 		muzzle_flash.rotation.z = randf() * PI * 2.0
 
 # =========================================================
@@ -741,22 +750,25 @@ func shoot():
 	get_tree().current_scene.add_child(bullet)
 
 	var spawn_pos = gun_tip.global_position
+	# Tir droit devant la caméra (pas décalé)
 	var direction = (-camera.global_transform.basis.z).normalized()
 	
 	# Spread
 	var spread = current_spread
 	if is_aiming:
-		spread *= 0.3
+		spread *= 0.15
 	if is_sprinting:
 		spread *= 2.0
-	direction += Vector3(
-		randf_range(-spread, spread),
-		randf_range(-spread, spread),
-		randf_range(-spread, spread)
-	)
-	direction = direction.normalized()
+	if spread > 0:
+		direction += Vector3(
+			randf_range(-spread, spread),
+			randf_range(-spread, spread),
+			randf_range(-spread, spread)
+		)
+		direction = direction.normalized()
 
-	spawn_pos += direction * 0.5
+	# Spawn la balle depuis le gun tip mais dans la direction de la caméra
+	spawn_pos = camera.global_position + direction * 1.0
 	bullet.global_position = spawn_pos
 	bullet.direction = direction
 	bullet.look_at(spawn_pos + direction, Vector3.UP)
@@ -1072,6 +1084,8 @@ func play_idle():
 func take_damage(amount):
 	health -= amount
 	time_since_damage = 0.0
+	if ai_director:
+		ai_director.register_player_damage()
 	damage_flash_timer = 0.4
 	camera_shake_intensity = clamp(float(amount) / 20.0, 0.3, 1.5)
 
@@ -1097,6 +1111,8 @@ func take_damage(amount):
 
 func die():
 	is_dead = true
+	if ai_director:
+		ai_director.register_player_death()
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	if anim_player:
 		anim_player.stop()
@@ -1334,7 +1350,7 @@ func _create_kill_counter_ui():
 	kill_counter_label.add_theme_constant_override("shadow_offset_x", 2)
 	kill_counter_label.add_theme_constant_override("shadow_offset_y", 2)
 	kill_counter_label.anchors_preset = Control.PRESET_BOTTOM_RIGHT
-	kill_counter_label.position = Vector2(-160, -80)
+	kill_counter_label.position = Vector2(-180, -130)
 	kill_counter_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	canvas.add_child(kill_counter_label)
 
@@ -1430,8 +1446,8 @@ func _create_weapon_label():
 	weapon_label.add_theme_constant_override("shadow_offset_y", 1)
 	weapon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	weapon_label.anchors_preset = Control.PRESET_BOTTOM_RIGHT
-	weapon_label.position = Vector2(-250, -55)
-	weapon_label.size = Vector2(240, 30)
+	weapon_label.position = Vector2(-260, -110)
+	weapon_label.size = Vector2(250, 30)
 	weapon_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	canvas.add_child(weapon_label)
 
@@ -1449,8 +1465,8 @@ func _create_grenade_label():
 	grenade_label.add_theme_constant_override("shadow_offset_y", 1)
 	grenade_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	grenade_label.anchors_preset = Control.PRESET_BOTTOM_RIGHT
-	grenade_label.position = Vector2(-250, -35)
-	grenade_label.size = Vector2(240, 25)
+	grenade_label.position = Vector2(-260, -85)
+	grenade_label.size = Vector2(250, 25)
 	grenade_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	canvas.add_child(grenade_label)
 
@@ -1488,8 +1504,8 @@ func _create_killstreak_label():
 	killstreak_label.add_theme_constant_override("shadow_offset_y", 1)
 	killstreak_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	killstreak_label.anchors_preset = Control.PRESET_BOTTOM_RIGHT
-	killstreak_label.position = Vector2(-250, -100)
-	killstreak_label.size = Vector2(240, 25)
+	killstreak_label.position = Vector2(-260, -155)
+	killstreak_label.size = Vector2(250, 25)
 	killstreak_label.visible = false
 	killstreak_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	canvas.add_child(killstreak_label)

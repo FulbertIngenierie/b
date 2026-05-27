@@ -65,6 +65,14 @@ var reload_timer := 0.0
 var is_reloading := false
 
 # =========================================================
+# AI DIRECTOR LINK
+# =========================================================
+
+var ai_director = null
+var reaction_timer := 0.0
+var reaction_delay := 0.8
+
+# =========================================================
 # PERCEPTION — ce que l'ennemi sait du monde
 # =========================================================
 
@@ -159,6 +167,7 @@ func _ready():
 	
 	_snap_to_ground()
 	_generate_patrol_points()
+	_find_ai_director()
 	
 	if anim_player:
 		_ensure_animations_loop()
@@ -223,6 +232,12 @@ func _update_timers(delta):
 			ammo = max_ammo
 	
 	state_timer += delta
+	
+	# Reaction timer
+	if can_see_target and reaction_timer < reaction_delay + 1.0:
+		reaction_timer += delta
+	if not can_see_target:
+		reaction_timer = 0.0
 
 # =========================================================
 # ÉTAPE 1: PERCEVOIR — observer le monde
@@ -239,11 +254,23 @@ func _perceive(delta):
 	# Raycast pour vérifier la ligne de vue
 	var sees_now = _check_line_of_sight()
 	
+	# Perception par le son (tir du joueur)
+	if not sees_now and distance_to_target < 35.0:
+		if player and "shooting" in player and player.shooting:
+			last_known_position = player.global_position
+			has_ever_seen_player = true
+			if bt_state == BTState.PATROL:
+				_transition_to(BTState.INVESTIGATE)
+				if ai_director:
+					ai_director.alert_squad(player.global_position, self)
+	
 	if sees_now:
 		can_see_target = true
 		last_known_position = player.global_position
 		time_since_seen = 0.0
 		has_ever_seen_player = true
+		if ai_director:
+			ai_director.alert_squad(player.global_position, self)
 	else:
 		can_see_target = false
 		time_since_seen += delta
@@ -525,8 +552,16 @@ func _try_shoot():
 	if not player or not is_instance_valid(player) or not player.is_inside_tree():
 		return
 	
+	# Temps de réaction adaptatif (AI Director)
+	if reaction_timer < reaction_delay:
+		return
+	
 	can_shoot = false
-	fire_cooldown = fire_rate
+	# Fire rate adaptatif
+	var actual_fire_rate = fire_rate
+	if ai_director:
+		actual_fire_rate = ai_director.get_enemy_fire_rate()
+	fire_cooldown = actual_fire_rate
 	ammo -= 1
 	
 	if gun_sound and gun_sound.stream:
@@ -556,7 +591,11 @@ func _fire_bullet():
 	var spawn_pos = get_gun_tip_position()
 	var target_pos = player.global_position + Vector3(0, 1.2, 0)
 	
+	# Spread adaptatif (AI Director)
 	var spread := 0.03
+	if ai_director:
+		var accuracy = ai_director.get_enemy_accuracy()
+		spread = 0.06 * (1.0 - accuracy)
 	target_pos += Vector3(
 		randf_range(-spread, spread),
 		randf_range(-spread, spread),
@@ -579,7 +618,13 @@ func _fire_bullet():
 	if result:
 		var collider = result.collider
 		if collider != null and collider.has_method("take_damage"):
-			collider.take_damage(damage)
+			# Dégâts adaptatifs (AI Director)
+			var actual_damage = damage
+			if ai_director:
+				actual_damage = ai_director.get_enemy_damage()
+			collider.take_damage(actual_damage)
+			if ai_director:
+				ai_director.register_player_damage()
 		_create_impact(result.position, result.normal)
 
 func _add_bullet(bullet, spawn_pos: Vector3, direction: Vector3):
@@ -735,6 +780,9 @@ func take_damage(amount):
 	if is_dead:
 		return
 	health -= amount
+	# Notifier l'AI Director
+	if ai_director:
+		ai_director.register_hit()
 	if hit_effect_scene and is_inside_tree():
 		var hit_effect = hit_effect_scene.instantiate()
 		add_child(hit_effect)
@@ -749,6 +797,8 @@ func die():
 		return
 	is_dead = true
 	bt_state = BTState.DEAD
+	if ai_director:
+		ai_director.register_kill()
 	velocity = Vector3.ZERO
 	if anim_player and anim_die != "":
 		anim_player.play(anim_die)
@@ -777,6 +827,12 @@ func find_player():
 	var players = get_tree().get_nodes_in_group("player")
 	if players.size() > 0:
 		player = players[0]
+
+func _find_ai_director():
+	var directors = get_tree().get_nodes_in_group("ai_director")
+	if directors.size() > 0:
+		ai_director = directors[0]
+		reaction_delay = ai_director.get_enemy_reaction_time()
 
 func _snap_to_ground():
 	var space_state = get_world_3d().direct_space_state
