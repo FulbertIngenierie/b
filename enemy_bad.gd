@@ -69,6 +69,8 @@ var can_shoot := true
 var fire_cooldown := 0.0
 var reload_timer := 0.0
 var is_reloading := false
+var death_timer := 0.0
+var respawn_delay := 10.0
 
 # =========================================================
 # AI DIRECTOR LINK
@@ -322,6 +324,10 @@ func _physics_process(delta):
 	
 	if is_dead:
 		velocity = Vector3.ZERO
+		# Respawn après 10 secondes
+		death_timer += delta
+		if death_timer >= respawn_delay:
+			_respawn()
 		return
 	
 	if not is_on_floor():
@@ -518,11 +524,17 @@ func _act_investigate(delta):
 
 func _act_advance(delta):
 	_face_player()
+	var is_shooting := false
 	if can_see_target and can_shoot and not is_reloading:
 		_try_shoot()
+		is_shooting = true
 	var target_pos = player.global_position if can_see_target else last_known_position
 	_move_toward(target_pos, run_speed, delta)
-	_play_anim("run", anim_run)
+	# Utiliser l'animation de tir en marchant si on tire, sinon course
+	if is_shooting and anim_shoot_walk != "":
+		_play_anim("shoot_walk", anim_shoot_walk)
+	else:
+		_play_anim("run", anim_run)
 	_sync_anim_speed(run_speed)
 
 func _act_hold(delta):
@@ -663,7 +675,6 @@ func _try_shoot():
 			gun_sound.stop()
 		gun_sound.play()
 	
-	_play_anim_shoot()
 	_fire_bullet()
 	
 	if ammo <= 0:
@@ -823,6 +834,8 @@ func _find_best_cover() -> Vector3:
 func _play_anim(tag: String, a_name: String):
 	if not anim_player:
 		return
+	if is_dead:
+		return  # Ne pas changer d'animation quand mort
 	if a_name == "":
 		if all_anims.size() > 0:
 			a_name = all_anims[0]
@@ -830,7 +843,6 @@ func _play_anim(tag: String, a_name: String):
 			return
 	# Chercher l'animation par nom exact ou partiel
 	if not anim_player.has_animation(a_name):
-		# Essayer avec le préfixe de librairie
 		var found := false
 		for lib_anim in anim_player.get_animation_list():
 			if lib_anim == a_name or lib_anim.ends_with("/" + a_name) or lib_anim.to_lower().contains(a_name.to_lower()):
@@ -839,8 +851,10 @@ func _play_anim(tag: String, a_name: String):
 				break
 		if not found:
 			return
+	# Si même animation et en cours, ne pas redémarrer
 	if current_anim == tag and anim_player.is_playing():
 		return
+	# Si l'animation actuelle est terminée, la relancer (pour les boucles)
 	anim_player.play(a_name)
 	anim_player.speed_scale = 1.0
 	current_anim = tag
@@ -891,17 +905,62 @@ func die():
 		return
 	is_dead = true
 	bt_state = BTState.DEAD
+	death_timer = 0.0
 	if ai_director:
 		ai_director.register_kill()
 	velocity = Vector3.ZERO
+	current_anim = ""  # Reset pour forcer l'animation die
 	if anim_player and anim_die != "":
+		# S'assurer que die ne boucle pas
+		var die_res = _get_animation_resource(anim_die)
+		if die_res:
+			die_res.loop_mode = Animation.LOOP_NONE
+		anim_player.stop()
 		anim_player.play(anim_die)
+		anim_player.speed_scale = 1.0
 	if hit_effect_scene and is_inside_tree() and get_tree():
 		var hit_effect = hit_effect_scene.instantiate()
 		if hit_effect:
 			get_tree().current_scene.add_child(hit_effect)
 			hit_effect.global_position = global_position + Vector3(0, 1.5, 0)
 			hit_effect.emitting = true
+
+# =========================================================
+# RESPAWN — renaît après 10 secondes
+# =========================================================
+
+func _respawn():
+	is_dead = false
+	bt_state = BTState.PATROL
+	health = max_health
+	ammo = max_ammo
+	death_timer = 0.0
+	is_reloading = false
+	current_anim = ""
+	state_timer = 0.0
+	state_change_cooldown = 0.0
+	can_shoot = true
+	fire_cooldown = 0.0
+	has_ever_seen_player = false
+	time_since_seen = 999.0
+	
+	# Position aléatoire autour de la position initiale (15-25m)
+	var angle = randf() * TAU
+	var dist = randf_range(15.0, 25.0)
+	var new_pos = initial_position + Vector3(cos(angle) * dist, 0, sin(angle) * dist)
+	new_pos.y = initial_position.y
+	global_position = new_pos
+	_snap_to_ground()
+	
+	# Régénérer les points de patrouille autour de la nouvelle position
+	_generate_patrol_points()
+	
+	# Remettre l'animation idle
+	if anim_player:
+		anim_player.stop()
+		_play_anim("idle", anim_idle)
+	
+	print("[", name, "] Respawn à ", global_position)
 
 # =========================================================
 # BLOOD SPLATTER
@@ -1027,13 +1086,24 @@ func _find_anim(candidates: Array) -> String:
 func _ensure_animations_loop():
 	if not anim_player:
 		return
-	var loop_anims = [anim_idle, anim_walk, anim_run, anim_crouch, anim_shoot]
+	# Ces animations DOIVENT boucler
+	var loop_anims = [anim_idle, anim_walk, anim_run, anim_crouch, anim_shoot, anim_shoot_walk]
 	for a_name in loop_anims:
 		if a_name == "":
 			continue
 		var anim = _get_animation_resource(a_name)
 		if anim:
 			anim.loop_mode = Animation.LOOP_LINEAR
+			print("  [LOOP] ", a_name)
+	# Ces animations NE DOIVENT PAS boucler (jouer 1 seule fois)
+	var no_loop_anims = [anim_die, anim_melee, anim_grenade, anim_reload]
+	for a_name in no_loop_anims:
+		if a_name == "":
+			continue
+		var anim = _get_animation_resource(a_name)
+		if anim:
+			anim.loop_mode = Animation.LOOP_NONE
+			print("  [NO LOOP] ", a_name)
 
 func _get_animation_resource(a_name: String) -> Animation:
 	if not anim_player:
